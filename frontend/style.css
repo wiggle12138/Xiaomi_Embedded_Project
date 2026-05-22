@@ -1,0 +1,121 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: Arial, "PingFang SC", "Microsoft YaHei", sans-serif;
+  background: #15171b;
+  color: #f2f2f2;
+}
+
+.container {
+  width: min(900px, 100%);
+  margin: 0 auto;
+  padding: 16px;
+}
+
+h1 {
+  margin: 0 0 12px 0;
+  font-size: 24px;
+}
+
+.card {
+  background: #22252b;
+  border: 1px solid #353943;
+  border-radius: 10px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.card h2 {
+  margin: 0 0 10px 0;
+  font-size: 18px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.row.column {
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.row.wrap {
+  flex-wrap: wrap;
+}
+
+button {
+  border: 1px solid #5f8dff;
+  background: #5f8dff;
+  color: #fff;
+  border-radius: 6px;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+button.secondary {
+  border-color: #666;
+  background: #444;
+}
+
+input[type="range"] {
+  width: 220px;
+}
+
+#cmdInput {
+  width: 100%;
+  max-width: 680px;
+  border: 1px solid #5d6472;
+  background: #151821;
+  color: #f2f2f2;
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+
+#voiceMockText {
+  width: 100%;
+  max-width: 680px;
+  border: 1px solid #5d6472;
+  background: #151821;
+  color: #f2f2f2;
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+
+#voiceSeconds {
+  width: 90px;
+  border: 1px solid #5d6472;
+  background: #151821;
+  color: #f2f2f2;
+  border-radius: 6px;
+  padding: 6px 8px;
+}
+
+.ptt-btn {
+  min-width: 140px;
+  font-weight: 700;
+}
+
+.ptt-btn.recording {
+  background: #d9534f;
+  border-color: #d9534f;
+}
+
+#voiceHint {
+  color: #b9c2d0;
+}
+
+#statusBox {
+  margin: 0;
+  min-height: 48px;
+  white-space: pre-wrap;
+  background: #181a1f;
+  border: 1px solid #333;
+  border-radius: 6px;
+  padding: 8px;
+}

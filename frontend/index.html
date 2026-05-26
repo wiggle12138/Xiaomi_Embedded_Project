@@ -2,102 +2,110 @@
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Task1 子板控制台</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>智能环境控制台</title>
   <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
-  <main class="container">
-    <h1>Task1 子板控制台</h1>
+  <div class="page">
+    <main class="page-scroll">
+      <h1>智能环境控制台</h1>
 
-    <section class="card">
-      <h2>E2 风扇</h2>
-      <div class="row">
-        <button id="fanOnBtn">开启风扇</button>
-        <button id="fanOffBtn" class="secondary">关闭风扇</button>
-      </div>
-      <div class="row">
-        <label for="fanSpeed">速度: <span id="fanSpeedValue">30</span></label>
-      </div>
-      <div class="row">
-        <input id="fanSpeed" type="range" min="0" max="100" value="30" />
-        <button id="fanSetBtn">设置速度</button>
-      </div>
-    </section>
+      <section id="wakeBanner" class="wake-banner">等待唤醒词「小爱同学」…</section>
 
-    <section class="card">
-      <h2>E1 灯光</h2>
-      <div class="row">
-        <button id="lightOnBtn">开灯</button>
-        <button id="lightOffBtn" class="secondary">关灯</button>
-      </div>
-      <div class="row">
-        <label>预设颜色:</label>
-      </div>
-      <div class="row wrap">
-        <button class="color-btn" data-r="255" data-g="0" data-b="0">红</button>
-        <button class="color-btn" data-r="0" data-g="255" data-b="0">绿</button>
-        <button class="color-btn" data-r="0" data-g="0" data-b="255">蓝</button>
-        <button class="color-btn" data-r="255" data-g="255" data-b="255">白</button>
-        <button class="color-btn" data-r="255" data-g="128" data-b="0">橙</button>
-      </div>
-      <div class="row">
-        <label for="lightBrightness">亮度: <span id="lightBrightnessValue">100</span></label>
-      </div>
-      <div class="row">
-        <input id="lightBrightness" type="range" min="0" max="100" value="100" />
-      </div>
-    </section>
+      <section class="card">
+        <h2>E2 风扇</h2>
+        <div class="row">
+          <button id="fanOnBtn">开启风扇</button>
+          <button id="fanOffBtn" class="secondary">关闭风扇</button>
+        </div>
+        <div class="row">
+          <label for="fanSpeed">速度: <span id="fanSpeedValue">30</span></label>
+        </div>
+        <div class="row">
+          <input id="fanSpeed" type="range" min="0" max="100" value="30" />
+          <button id="fanSetBtn">设置速度</button>
+        </div>
+      </section>
 
-    <section class="card">
-      <h2>E3 窗帘</h2>
-      <div class="row">
-        <button id="curtainOpenBtn">全开</button>
-        <button id="curtainCloseBtn" class="secondary">全关</button>
-      </div>
-      <div class="row">
-        <label for="curtainPos">开度: <span id="curtainPosValue">0</span></label>
-      </div>
-      <div class="row">
-        <input id="curtainPos" type="range" min="0" max="100" value="0" />
-        <button id="curtainSetBtn">设置开度</button>
-      </div>
-    </section>
+      <section class="card">
+        <h2>E1 灯光</h2>
+        <div class="row">
+          <button id="lightOnBtn">开灯</button>
+          <button id="lightOffBtn" class="secondary">关灯</button>
+        </div>
+        <div class="row">
+          <label>预设颜色:</label>
+        </div>
+        <div class="row wrap">
+          <button class="color-btn" data-r="255" data-g="0" data-b="0">红</button>
+          <button class="color-btn" data-r="0" data-g="255" data-b="0">绿</button>
+          <button class="color-btn" data-r="0" data-g="0" data-b="255">蓝</button>
+          <button class="color-btn" data-r="255" data-g="255" data-b="255">白</button>
+          <button class="color-btn" data-r="255" data-g="128" data-b="0">橙</button>
+        </div>
+        <div class="row">
+          <label for="lightBrightness">亮度: <span id="lightBrightnessValue">100</span></label>
+        </div>
+        <div class="row">
+          <input id="lightBrightness" type="range" min="0" max="100" value="100" />
+        </div>
+      </section>
 
-    <section class="card">
-      <h2>AI 文本指令</h2>
-      <div class="row column">
-        <label for="cmdInput">输入自然语言控制命令（例如：打开窗帘、风扇速度调到40、灯光改成蓝色亮度60）</label>
-        <input id="cmdInput" type="text" placeholder="请输入控制指令..." />
-      </div>
-      <div class="row">
-        <button id="cmdSendBtn">发送指令</button>
-      </div>
-    </section>
+      <section class="card">
+        <h2>E3 窗帘</h2>
+        <div class="row">
+          <button id="curtainOpenBtn">全开</button>
+          <button id="curtainCloseBtn" class="secondary">全关</button>
+        </div>
+        <div class="row">
+          <label for="curtainPos">开度: <span id="curtainPosValue">0</span></label>
+        </div>
+        <div class="row">
+          <input id="curtainPos" type="range" min="0" max="100" value="0" />
+          <button id="curtainSetBtn">设置开度</button>
+        </div>
+      </section>
 
-    <section class="card">
-      <h2>S3/E4 语音入口（按住说话）</h2>
-      <div class="row">
-        <button id="pttBtn" class="ptt-btn">按住说话</button>
-        <span id="voiceHint">待命（最长60秒）</span>
-      </div>
-      <div class="row">
-        <button id="voicePlayBtn" class="secondary">回放最新录音</button>
-      </div>
-      <div class="row column">
-        <label for="voiceMockText">mock 识别文本（后续替换为火山ASR结果）</label>
-        <input id="voiceMockText" type="text" placeholder="例如：打开窗帘 / 风扇速度调到30。留空则只录音不执行。" />
-      </div>
-      <div class="row">
-        <small>操作方式：按下按钮开始录音，松开按钮停止录音并按 mock 文本执行（如果有）。</small>
-      </div>
-    </section>
+      <section class="card">
+        <h2>状态</h2>
+        <pre id="statusBox">等待操作...</pre>
+      </section>
+    </main>
 
-    <section class="card">
-      <h2>状态</h2>
-      <pre id="statusBox">等待操作...</pre>
-    </section>
-  </main>
+    <!-- 底部固定输入栏：文字 / 语音 二选一 -->
+    <footer class="composer" id="composer">
+      <div id="mockPanel" class="composer-mock hidden">
+        <input id="voiceMockText" type="text" placeholder="mock 识别文本，留空仅录音" />
+      </div>
+      <p id="voiceHint" class="composer-hint">待命（最长 60 秒）</p>
+      <div class="composer-row">
+        <button type="button" id="modeToggleBtn" class="icon-btn" aria-label="切换到语音输入" title="语音输入">
+          <span class="icon-voice" aria-hidden="true"></span>
+          <span class="icon-keyboard hidden" aria-hidden="true"></span>
+        </button>
+
+        <div class="composer-main">
+          <div id="textPanel" class="composer-panel">
+            <input id="cmdInput" type="text" placeholder="输入控制指令，如：打开窗帘" />
+            <button type="button" id="cmdSendBtn" class="send-btn">发送</button>
+          </div>
+          <div id="voicePanel" class="composer-panel hidden">
+            <button type="button" id="pttBtn" class="ptt-btn">按住 说话</button>
+          </div>
+        </div>
+
+        <div class="composer-tools">
+          <button type="button" id="voicePlayBtn" class="icon-btn" title="回放最新录音" aria-label="回放最新录音">
+            <span class="icon-play" aria-hidden="true"></span>
+          </button>
+          <button type="button" id="mockToggleBtn" class="icon-btn" title="mock 识别文本" aria-label="mock 识别文本">
+            <span class="icon-mock" aria-hidden="true"></span>
+          </button>
+        </div>
+      </div>
+    </footer>
+  </div>
 
   <script src="/app.js"></script>
 </body>

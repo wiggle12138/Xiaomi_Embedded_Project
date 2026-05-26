@@ -1,0 +1,30 @@
+# --- 运行产物（勿提交）---
+logs/
+
+# native 编译输出（run.sh 本地 make 生成）
+bin/
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.pyo
+.Python
+*.egg-info/
+.eggs/
+
+# --- 本地音频 ---
+assets/speech/*.wav
+
+# --- KWS 模型（大文件放 task3/models；此处仅 keywords.txt 可提交）---
+models/**/*.onnx
+models/**/tokens.txt
+models/**/*.tar.bz2
+models/**/encoder*
+models/**/decoder*
+models/**/joiner*
+
+# --- 编辑器 / 系统 ---
+.DS_Store
+*~
+.vscode/
+.idea/

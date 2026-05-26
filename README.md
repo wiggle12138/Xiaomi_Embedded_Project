@@ -15,7 +15,7 @@
 ```text
 Project/
   backend/server.py       # Python HTTP 服务
-  frontend/index.html     # 前端页面
+  frontend/index.html     # 前端页面（底部固定文字/语音输入栏）
   frontend/app.js
   frontend/style.css
   native/Makefile         # 编译 e1_ctl/e2_ctl/e3_ctl
@@ -93,6 +93,13 @@ cd /root/U2Project/Project
 - `全关`：0%
 - `设置开度`：按滑条值设置 0~100
 
+### 底部输入栏（文字 / 语音）
+
+- 固定在页面底部；左侧按钮在「语音」「键盘」图标间切换模式。
+- **文字模式**：输入框 +「发送」；Enter 或点击发送，调用 `/api/ai/command`。
+- **语音模式**：「按住 说话」；松开结束并上传录音。
+- 右侧小图标：**回放**最新录音；**M** 展开 mock 识别文本（留空则只录音不执行）。
+
 ---
 
 ## 6. 接口清单（含语音入口）
@@ -115,6 +122,25 @@ cd /root/U2Project/Project
 - `POST /api/voice/stop`，body: `{"mock_text":"可选，留空仅录音"}`（松开停止）
 - `POST /api/voice/playback`，body: `{"audio_file":"可选，不传则播最近录音"}`
 - `POST /api/voice/command`，body: `{"seconds":3,"mock_text":"打开窗帘"}`（兼容旧方式）
+- `GET /api/wake/status`，流式唤醒状态（常开 KWS「小爱同学」）
+
+### 流式语音唤醒（S3 + E4）
+
+- 常开 KWS，识别 **「小爱同学」** 后：
+  - 页面横幅显示 **「你好呀」**（占位，约 5s）
+  - E4 扬声器播放 **`assets/speech/reply.wav`**（自行录制，16kHz mono 推荐）
+- 首次配置（复用 task3 的 KWS 模型即可）：
+
+```bash
+cd /root/U2Project/Project
+conda activate task3
+./scripts/gen_wake_keywords.sh    # 写入 Project/models/keywords.txt
+# 将自录 reply.wav 放到 assets/speech/
+./scripts/stop.sh && ./scripts/run.sh
+```
+
+- 关闭唤醒：`WAKE_ENABLED=0 ./scripts/run.sh`
+- 环境变量：`WAKE_REPLY_WAV`（回复音频）、`WAKE_GREETING_SECONDS`（前端展示秒数）
 
 示例（自然语言）：
 

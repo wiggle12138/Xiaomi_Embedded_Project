@@ -23,7 +23,19 @@ if [[ -f "${PID_FILE}" ]]; then
 fi
 
 echo "[2/3] 启动后端服务..."
-TASK1_PORT="${PORT}" TASK1_HOST="${HOST}" nohup python3 "${PROJECT_DIR}/backend/server.py" \
+PYTHON="${PYTHON:-python3}"
+CONDA_DIR="${CONDA_DIR:-/root/miniconda3}"
+ENV_NAME="${TASK3_CONDA_ENV:-task3}"
+if [[ "${WAKE_USE_CONDA:-1}" == "1" && -x "${CONDA_DIR}/bin/conda" ]]; then
+  # shellcheck source=/dev/null
+  source "${CONDA_DIR}/etc/profile.d/conda.sh"
+  if conda activate "${ENV_NAME}" 2>/dev/null; then
+    PYTHON="$(which python3)"
+    echo "唤醒/KWS 使用 conda 环境: ${ENV_NAME} (${PYTHON})"
+  fi
+fi
+
+TASK1_PORT="${PORT}" TASK1_HOST="${HOST}" nohup "${PYTHON}" "${PROJECT_DIR}/backend/server.py" \
   > "${LOG_DIR}/task1.log" 2>&1 &
 NEW_PID=$!
 echo "${NEW_PID}" > "${PID_FILE}"

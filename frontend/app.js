@@ -1,4 +1,5 @@
 const statusBox = document.getElementById("statusBox");
+const wakeBanner = document.getElementById("wakeBanner");
 
 const fanSpeed = document.getElementById("fanSpeed");
 const fanSpeedValue = document.getElementById("fanSpeedValue");
@@ -14,8 +15,16 @@ const pttBtn = document.getElementById("pttBtn");
 const voiceHint = document.getElementById("voiceHint");
 const voicePlayBtn = document.getElementById("voicePlayBtn");
 const voiceMockText = document.getElementById("voiceMockText");
+const modeToggleBtn = document.getElementById("modeToggleBtn");
+const textPanel = document.getElementById("textPanel");
+const voicePanel = document.getElementById("voicePanel");
+const mockPanel = document.getElementById("mockPanel");
+const mockToggleBtn = document.getElementById("mockToggleBtn");
+const iconVoice = modeToggleBtn.querySelector(".icon-voice");
+const iconKeyboard = modeToggleBtn.querySelector(".icon-keyboard");
 
 let currentLight = { r: 255, g: 255, b: 255, brightness: 100 };
+let inputMode = "text"; // text | voice
 let recording = false;
 let recordStartTs = 0;
 let recordTimerId = null;
@@ -209,6 +218,34 @@ cmdInput.addEventListener("keydown", (event) => {
   }
 });
 
+/** 切换底部输入模式：文字 ↔ 语音 */
+function setInputMode(mode) {
+  if (mode !== "text" && mode !== "voice") return;
+  if (mode === "text" && recording) {
+    stopVoiceRecording();
+  }
+  inputMode = mode;
+  const isText = mode === "text";
+  textPanel.classList.toggle("hidden", !isText);
+  voicePanel.classList.toggle("hidden", isText);
+  iconVoice.classList.toggle("hidden", !isText);
+  iconKeyboard.classList.toggle("hidden", isText);
+  modeToggleBtn.setAttribute(
+    "aria-label",
+    isText ? "切换到语音输入" : "切换到文字输入"
+  );
+  modeToggleBtn.title = isText ? "语音输入" : "文字输入";
+}
+
+modeToggleBtn.addEventListener("click", () => {
+  setInputMode(inputMode === "text" ? "voice" : "text");
+});
+
+mockToggleBtn.addEventListener("click", () => {
+  const show = mockPanel.classList.toggle("hidden");
+  mockToggleBtn.classList.toggle("active", !show);
+});
+
 voicePlayBtn.addEventListener("click", async () => {
   try {
     const data = await postJson("/api/voice/playback", {});
@@ -249,7 +286,7 @@ async function startVoiceRecording() {
     recording = true;
     recordStartTs = Date.now();
     pttBtn.classList.add("recording");
-    pttBtn.textContent = "松开结束";
+    pttBtn.textContent = "松开 结束";
     setVoiceHint("正在说话...");
     setStatus("录音已开始，正在说话...");
     startRecordTimer();
@@ -263,7 +300,7 @@ async function stopVoiceRecording() {
   recording = false;
   stopRecordTimer();
   pttBtn.classList.remove("recording");
-  pttBtn.textContent = "按住说话";
+  pttBtn.textContent = "按住 说话";
   setVoiceHint("正在停止录音...");
 
   try {
@@ -277,9 +314,9 @@ async function stopVoiceRecording() {
     } else {
       setStatus(`录音完成: ${data.data.audio_file}`);
     }
-    setVoiceHint("待命（最长60秒）");
+    setVoiceHint("待命（最长 60 秒）");
   } catch (err) {
-    setVoiceHint("待命（最长60秒）");
+    setVoiceHint("待命（最长 60 秒）");
     setStatus(`停止录音失败: ${err.message}`, true);
   }
 }
@@ -308,4 +345,20 @@ pttBtn.addEventListener("touchcancel", (event) => {
   stopVoiceRecording();
 }, { passive: false });
 
+async function pollWakeStatus() {
+  try {
+    const res = await fetch("/api/wake/status");
+    const json = await res.json();
+    if (!json.ok) return;
+    const w = json.data;
+    const awake = w.state === "awake";
+    wakeBanner.classList.toggle("awake", awake);
+    wakeBanner.textContent = awake && w.greeting ? w.greeting : w.message || "—";
+  } catch (_) {
+    /* 唤醒未启用时忽略 */
+  }
+}
+
 refreshState();
+pollWakeStatus();
+setInterval(pollWakeStatus, 500);

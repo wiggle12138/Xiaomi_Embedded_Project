@@ -12,6 +12,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse
 
+import wake_worker
+
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
 FRONTEND_DIR = ROOT_DIR / "frontend"
@@ -143,6 +145,16 @@ def playback_audio(audio_path):
         err = proc.stderr.strip() or proc.stdout.strip() or "回放失败"
         raise RuntimeError(err)
     return True
+
+
+def speak_wake_reply():
+    """扬声器回复：播放 assets/speech/reply.wav（自行录制）。"""
+    wav = os.environ.get("WAKE_REPLY_WAV", str(ROOT_DIR / "assets/speech/reply.wav"))
+    path = Path(wav)
+    if not path.is_file():
+        print(f"[project] 未找到回复音频 {path}，请将 reply.wav 放入 assets/speech/")
+        return
+    playback_audio(path)
 
 
 def latest_audio_file():
@@ -520,6 +532,9 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/voice/status":
             self._send_json(200, {"ok": True, "data": _voice_snapshot()})
             return
+        if path == "/api/wake/status":
+            self._send_json(200, {"ok": True, "data": wake_worker.snapshot()})
+            return
 
         if path in ("/", "/index.html"):
             self._serve_file(FRONTEND_DIR / "index.html")
@@ -675,6 +690,8 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main():
+    wake_worker.set_speak_fn(speak_wake_reply)
+    wake_worker.try_start()
     server = ThreadingHTTPServer((HOST, PORT), Handler)
     print(f"project server listening on http://{HOST}:{PORT}")
     print(f"frontend root: {FRONTEND_DIR}")

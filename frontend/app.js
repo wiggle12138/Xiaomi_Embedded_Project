@@ -29,10 +29,37 @@ let recording = false;
 let recordStartTs = 0;
 let recordTimerId = null;
 const MAX_RECORD_SECONDS = 60;
+let textCommandInFlight = false;
 
 function setStatus(text, isError = false) {
   statusBox.textContent = text;
   statusBox.style.color = isError ? "#ff9da4" : "#c9f0c9";
+}
+
+function buildTextCommandStatus(resp) {
+  const data = resp && resp.data ? resp.data : {};
+  const text = data.text || "";
+  const branchMode = data.nlp && data.nlp.mode ? data.nlp.mode : "unknown";
+  let branchLabel = "分支: 未知";
+  if (branchMode === "direct") branchLabel = "分支: 直接指令";
+  if (branchMode === "llm") branchLabel = "分支: LLM";
+  if (branchMode === "rule_fallback") branchLabel = "分支: 规则兜底";
+
+  const action = data.action || {};
+  const actionText = action.device && action.action
+    ? `动作: ${action.device}.${action.action}`
+    : "动作: -";
+
+  const lines = [
+    `请求: ${text || "-"}`,
+    branchLabel,
+    actionText,
+  ];
+  if (branchMode === "llm" && data.nlp && Number.isFinite(Number(data.nlp.llm_elapsed_ms))) {
+    lines.push(`LLM 思考时间: ${Number(data.nlp.llm_elapsed_ms)} ms`);
+  }
+  lines.push(`结果: ${resp.message || data.message || "-"}`);
+  return lines.join("\n");
 }
 
 async function postJson(url, payload = {}) {
@@ -202,12 +229,36 @@ async function submitTextCommand() {
     setStatus("请输入要执行的文本指令", true);
     return;
   }
+  if (textCommandInFlight) {
+    setStatus("上一条文本指令仍在处理中，请稍候...", true);
+    return;
+  }
+
+  textCommandInFlight = true;
+  cmdSendBtn.disabled = true;
+  cmdInput.disabled = true;
+
+  let routeLabel = "分支: 未知";
+  try {
+    const routeResp = await postJson("/api/ai/route", { text });
+    const mode = routeResp?.data?.route?.mode;
+    if (mode === "direct") routeLabel = "分支: 直接指令";
+    if (mode === "llm") routeLabel = "分支: LLM";
+    setStatus(`请求: ${text}\n${routeLabel}\n处理中...`);
+  } catch (err) {
+    setStatus(`请求: ${text}\n分支预判失败，继续执行...\n${err.message}`);
+  }
+
   try {
     const data = await postJson("/api/ai/command", { text });
-    setStatus(`已执行: ${data.message}`);
+    setStatus(buildTextCommandStatus(data));
     await refreshState();
   } catch (err) {
     setStatus(`文本指令执行失败: ${err.message}`, true);
+  } finally {
+    textCommandInFlight = false;
+    cmdSendBtn.disabled = false;
+    cmdInput.disabled = false;
   }
 }
 
@@ -359,6 +410,7 @@ async function pollWakeStatus() {
   }
 }
 
+const WAKE_POLL_INTERVAL_MS = 3000;
 refreshState();
 pollWakeStatus();
-setInterval(pollWakeStatus, 500);
+setInterval(pollWakeStatus, WAKE_POLL_INTERVAL_MS);

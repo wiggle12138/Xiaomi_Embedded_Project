@@ -7,12 +7,15 @@ import shutil
 import subprocess
 import threading
 import time
+import traceback
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse
 
+import ai_adapter
 import wake_worker
+from ai_schema import normalize_command
 
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
@@ -419,9 +422,12 @@ def _extract_percent(text):
     return clamp(int(match.group(1)), 0, 100)
 
 
-def parse_text_to_action(text):
+def parse_text_to_action(text, state=None):
     if not isinstance(text, str) or not text.strip():
         raise ValueError("text 不能为空")
+
+    if state is None:
+        state = _snapshot_state()
 
     t = re.sub(r"\s+", "", text.lower())
 
@@ -550,11 +556,16 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         path = urlparse(self.path).path
+        started_at = time.time()
         try:
             payload = self._read_json()
         except json.JSONDecodeError:
             self._send_json(400, {"ok": False, "error": "JSON 格式错误"})
             return
+        if os.environ.get("LOG_POST_PAYLOAD", "0") == "1":
+            print(f"[project] POST {path} payload={json.dumps(payload, ensure_ascii=False)}")
+        else:
+            print(f"[project] POST {path}")
 
         try:
             if path == "/api/fan/power":
@@ -599,13 +610,47 @@ class Handler(BaseHTTPRequestHandler):
                     },
                     source="http",
                 )
+            elif path == "/api/ai/route":
+                text = payload.get("text", "")
+                state = _snapshot_state()
+                try:
+                    action = parse_text_to_action(text, state=state)
+                    result = {
+                        "source": "route",
+                        "message": "direct",
+                        "route": {
+                            "mode": "direct",
+                            "action": normalize_command(action),
+                        },
+                    }
+                except ValueError:
+                    result = {
+                        "source": "route",
+                        "message": "llm",
+                        "route": {
+                            "mode": "llm",
+                        },
+                    }
             elif path == "/api/ai/command":
                 if isinstance(payload.get("command"), dict):
-                    result = execute_action(payload["command"], source="structured")
+                    action = normalize_command(payload["command"])
+                    result = execute_action(action, source="structured")
                 else:
                     text = payload.get("text", "")
-                    action = parse_text_to_action(text)
-                    result = execute_action(action, source="text")
+                    state = _snapshot_state()
+                    try:
+                        # 直接指令优先：可直接执行则不走 LLM。
+                        action = parse_text_to_action(text, state=state)
+                        result = execute_action(action, source="text_direct")
+                        result["nlp"] = {"mode": "direct"}
+                    except ValueError as direct_err:
+                        # 非直接指令再走 LLM。
+                        parsed = ai_adapter.parse_text_to_command(text=text, state=state)
+                        if parsed["ok"]:
+                            result = execute_action(parsed["command"], source=parsed["source"])
+                            result["nlp"] = parsed["meta"]
+                        else:
+                            raise ValueError(f"直接指令不匹配({direct_err})，且 LLM 未可用")
                     result["text"] = text
             elif path == "/api/voice/record":
                 seconds = payload.get("seconds", 3)
@@ -640,7 +685,7 @@ class Handler(BaseHTTPRequestHandler):
                 }
                 transcript = str(payload.get("mock_text", "")).strip()
                 if transcript:
-                    action = parse_text_to_action(transcript)
+                    action = parse_text_to_action(transcript, state=_snapshot_state())
                     exec_result = execute_action(action, source="voice")
                     result["message"] = exec_result["message"]
                     result["action"] = exec_result["action"]
@@ -671,22 +716,32 @@ class Handler(BaseHTTPRequestHandler):
                 if not transcript:
                     raise ValueError("当前为语音链路第一版，请传入 mock_text 作为识别文本")
 
-                action = parse_text_to_action(transcript)
+                action = parse_text_to_action(transcript, state=_snapshot_state())
                 result = execute_action(action, source="voice")
                 result["audio_file"] = str(file_path)
                 result["transcript"] = transcript
             else:
                 self._send_json(404, {"ok": False, "error": "接口不存在"})
                 return
+            elapsed_ms = int((time.time() - started_at) * 1000)
+            print(f"[project] POST {path} ok elapsed_ms={elapsed_ms}")
             self._send_json(200, {"ok": True, "data": result, "message": result["message"]})
         except ValueError as exc:
+            elapsed_ms = int((time.time() - started_at) * 1000)
+            print(f"[project] POST {path} bad_request elapsed_ms={elapsed_ms} error={exc}")
             self._send_json(400, {"ok": False, "error": str(exc)})
         except Exception as exc:
+            elapsed_ms = int((time.time() - started_at) * 1000)
+            print(f"[project] POST {path} failed elapsed_ms={elapsed_ms} error={exc!r}")
+            print(traceback.format_exc())
             self._send_json(500, {"ok": False, "error": str(exc)})
 
     def log_message(self, fmt, *args):
-        # 保留简洁日志，方便现场调试
-        print("[project]", fmt % args)
+        message = fmt % args
+        # 前端会高频轮询唤醒状态，默认关闭该日志，避免淹没关键日志。
+        if "GET /api/wake/status" in message and os.environ.get("LOG_WAKE_STATUS", "0") != "1":
+            return
+        print("[project]", message)
 
 
 def main():

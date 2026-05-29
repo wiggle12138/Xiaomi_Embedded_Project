@@ -28,3 +28,6 @@ models/**/joiner*
 *~
 .vscode/
 .idea/
+
+# --- 本地运行配置（含密钥，不提交）---
+config/runtime.env

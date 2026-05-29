@@ -1,49 +1,32 @@
-# Project - E5 页面控制 + AI/语音入口（P1）
+# Project：E5 环境控制 + 语音 + LLM 入口
 
-本项目实现了一个最小可行控制台：
+本项目是 U2 主机上的产品化控制台，负责统一控制：
 
-- E2 风扇：开关、速度(0~100)
-- E1 灯：开关、预设颜色、亮度(0~100)
-- E3 窗帘：全开/全关、开度(0~100)
+- `E2` 风扇：开关、速度 `0~100`
+- `E1` 灯光：开关、颜色、亮度 `0~100`
+- `E3` 窗帘：全开/全关、开度 `0~100`
 
-页面在 E5 屏幕（Linux 图形环境）中打开即可操作。
+并提供：
 
----
-
-## 1. 目录结构
-
-```text
-Project/
-  backend/server.py       # Python HTTP 服务
-  frontend/index.html     # 前端页面（底部固定文字/语音输入栏）
-  frontend/app.js
-  frontend/style.css
-  native/Makefile         # 编译 e1_ctl/e2_ctl/e3_ctl
-  native/e1_ctl.cpp
-  native/e2_ctl.cpp
-  native/e3_ctl.cpp
-  scripts/run.sh          # 启动脚本
-  scripts/stop.sh         # 停止脚本
-  logs/                   # 运行日志目录(启动时自动创建)
-```
+- 文本自然语言控制（LLM）
+- 语音录音与回放
+- 唤醒词检测（S3 + E4）
 
 ---
 
-## 2. 运行前准备
+## 1. 快速开始
 
-1. 确认你在 U2 Linux 主机上。
-2. 确认硬件已正确堆叠并供电：E1、E2、E3。
-3. 确认系统存在 I2C 设备节点，例如：
+### 1.1 运行前检查
+
+1. 确认在 U2 Linux 主机上。
+2. 确认子板堆叠与供电正常（E1/E2/E3，语音场景可加 S3/E4）。
+3. 确认 I2C 设备节点存在：
 
 ```bash
 ls /dev/i2c-*
 ```
 
----
-
-## 3. 启动项目
-
-在 `Project` 目录执行：
+### 1.2 启动
 
 ```bash
 cd /root/U2Project/Project
@@ -51,20 +34,12 @@ chmod +x scripts/run.sh scripts/stop.sh
 ./scripts/run.sh
 ```
 
-脚本会自动完成：
+默认访问：
 
-1. 编译本地控制程序（`e1_ctl/e2_ctl/e3_ctl`）
-2. 启动 Python 服务（默认端口 `8080`）
-3. 输出访问地址与日志位置
+- 本机：`http://127.0.0.1:8080`
+- 局域网：`http://<U2_IP>:8080`
 
-默认访问地址：
-
-- 本机访问：`http://127.0.0.1:8080`
-- 局域网访问：`http://<U2_IP>:8080`
-
----
-
-## 4. 停止项目
+### 1.3 停止
 
 ```bash
 cd /root/U2Project/Project
@@ -73,117 +48,201 @@ cd /root/U2Project/Project
 
 ---
 
-## 5. 页面操作说明
+## 2. 目录结构
 
-### E2 风扇
-
-- `开启风扇`：按当前速度开启，若无历史速度默认 30
-- `关闭风扇`：停止
-- `设置速度`：按滑条值设置 0~100
-
-### E1 灯光
-
-- `开灯/关灯`
-- 颜色按钮：红/绿/蓝/白/橙
-- 亮度滑条：0~100（变化后自动下发）
-
-### E3 窗帘
-
-- `全开`：100%
-- `全关`：0%
-- `设置开度`：按滑条值设置 0~100
-
-### 底部输入栏（文字 / 语音）
-
-- 固定在页面底部；左侧按钮在「语音」「键盘」图标间切换模式。
-- **文字模式**：输入框 +「发送」；Enter 或点击发送，调用 `/api/ai/command`。
-- **语音模式**：「按住 说话」；松开结束并上传录音。
-- 右侧小图标：**回放**最新录音；**M** 展开 mock 识别文本（留空则只录音不执行）。
+```text
+Project/
+  backend/server.py         # HTTP 服务与路由
+  backend/ai_adapter.py     # LLM 请求与结果解析
+  backend/ai_schema.py      # command 白名单与参数校验
+  backend/wake_worker.py    # 唤醒状态管理
+  backend/wake_engine.py    # KWS 引擎（sherpa-onnx + arecord）
+  frontend/index.html
+  frontend/app.js
+  frontend/style.css
+  native/                   # e1_ctl / e2_ctl / e3_ctl
+  scripts/run.sh
+  scripts/stop.sh
+  scripts/gen_wake_keywords.sh
+  logs/                     # 启动后自动生成
+```
 
 ---
 
-## 6. 接口清单（含语音入口）
+## 3. 页面使用说明
+
+### 3.1 设备控制区
+
+- 风扇：开关、速度
+- 灯光：开关、颜色预设、亮度
+- 窗帘：全开、全关、开度
+
+### 3.2 底部输入栏
+
+- 文本模式：输入自然语言后发送
+- 语音模式：按住录音、松开结束
+- 右侧工具：回放最新录音、mock 文本
+
+### 3.3 状态栏（重点）
+
+发送文本后状态栏会显示：
+
+- 请求文本
+- 分支：`直接指令` 或 `LLM`
+- 动作：例如 `light.on`
+- LLM 思考时间（仅 LLM 分支）
+- 最终执行结果
+
+---
+
+## 4. API 概览
+
+### 4.1 设备与状态
 
 - `GET /api/health`
 - `GET /api/state`
-- `POST /api/fan/power`，body: `{"on": true|false}`
-- `POST /api/fan/speed`，body: `{"speed": 0~100}`
-- `POST /api/light/power`，body: `{"on": true|false}`
-- `POST /api/light/rgb`，body: `{"r":0~255,"g":0~255,"b":0~255,"brightness":0~100}`
-- `POST /api/curtain/open`，body: `{}`
-- `POST /api/curtain/close`，body: `{}`
-- `POST /api/curtain/position`，body: `{"position":0~100}`
-- `POST /api/ai/command`，支持两种输入：
-  - 自然语言：`{"text":"打开窗帘"}`
+- `POST /api/fan/power` body: `{"on": true|false}`
+- `POST /api/fan/speed` body: `{"speed": 0~100}`
+- `POST /api/light/power` body: `{"on": true|false}`
+- `POST /api/light/rgb` body: `{"r":0~255,"g":0~255,"b":0~255,"brightness":0~100}`
+- `POST /api/curtain/open`
+- `POST /api/curtain/close`
+- `POST /api/curtain/position` body: `{"position":0~100}`
+
+### 4.2 AI 文本入口
+
+- `POST /api/ai/route`：仅判断分支（direct / llm）
+  - body: `{"text":"太黑了"}`
+- `POST /api/ai/command`：执行文本命令
+  - 自然语言：`{"text":"把窗帘开到60"}`
   - 结构化：`{"command":{"device":"curtain","action":"open","params":{}}}`
-- `GET /api/voice/latest`，返回最近录音文件
-- `GET /api/voice/status`，返回按住说话会话状态
-- `POST /api/voice/start`，body: `{"max_seconds":60,"rate":16000}`（按下开始）
-- `POST /api/voice/stop`，body: `{"mock_text":"可选，留空仅录音"}`（松开停止）
-- `POST /api/voice/playback`，body: `{"audio_file":"可选，不传则播最近录音"}`
-- `POST /api/voice/command`，body: `{"seconds":3,"mock_text":"打开窗帘"}`（兼容旧方式）
-- `GET /api/wake/status`，流式唤醒状态（常开 KWS「小爱同学」）
 
-### 流式语音唤醒（S3 + E4）
+### 4.3 语音相关
 
-- 常开 KWS，识别 **「小爱同学」** 后：
-  - 页面横幅显示 **「你好呀」**（占位，约 5s）
-  - E4 扬声器播放 **`assets/speech/reply.wav`**（自行录制，16kHz mono 推荐）
-- 首次配置（复用 task3 的 KWS 模型即可）：
+- `GET /api/voice/latest`
+- `GET /api/voice/status`
+- `POST /api/voice/start` body: `{"max_seconds":60,"rate":16000}`
+- `POST /api/voice/stop` body: `{"mock_text":"可选"}`
+- `POST /api/voice/playback` body: `{"audio_file":"可选"}`
+- `POST /api/voice/command` body: `{"seconds":3,"mock_text":"打开窗帘"}`
+- `GET /api/wake/status`
+
+---
+
+## 5. LLM 设计说明（自然语言 -> 设备动作）
+
+这部分是当前产品链路核心。
+
+### 5.1 处理流程
+
+1. 前端发送自然语言到 `/api/ai/command`，例如：`"现在环境好黑"`
+2. 后端先做“直接指令判断”
+   - 能直接识别（如“开灯”“关风扇”）则直接执行
+   - 不能直接识别才进入 LLM
+3. 后端给 LLM 的输入不是裸文本，而是：
+   - 设备能力约束（fan/light/curtain + 可执行 action）
+   - 当前设备状态（`STATE`）
+   - 用户文本
+4. LLM 返回结构化 JSON（command）
+5. 后端用 `ai_schema` 做白名单和参数校验
+6. 统一调用 `execute_action()` 执行硬件控制
+7. 返回前端结果并展示在状态栏
+
+### 5.2 为什么要“追加 prompt”
+
+只给模型一句“现在环境好黑”时，模型不知道你的设备能力边界。  
+追加 prompt 的作用是把模型约束为“设备指令解析器”，确保它输出可执行 JSON，而不是纯聊天回答。
+
+### 5.3 示例：从自然语言到硬件动作
+
+输入：`太黑了`  
+LLM 输出（示意）：
+
+```json
+{
+  "device": "light",
+  "action": "on",
+  "params": {},
+  "need_confirm": false,
+  "reason": "环境偏暗，需要照明"
+}
+```
+
+后端执行：`execute_action -> do_light_power -> e1_ctl`  
+设备动作：开灯。
+
+---
+
+## 6. `run.sh` 常用配置
+
+`scripts/run.sh` 提供统一配置入口，常用项如下：
+
+推荐做法（避免密钥写进脚本）：
+
+```bash
+cd /root/U2Project/Project
+cp config/runtime.env.example config/runtime.env
+# 编辑 config/runtime.env，填写 LLM_API_KEY 等本地配置
+```
+
+`run.sh` 启动时会自动加载 `config/runtime.env`，且该文件已加入 `.gitignore`。
+
+- `TASK1_PORT`：服务端口（默认 `8080`）
+- `RUN_FOREGROUND`：前台模式（`1` 前台，`0` 后台）
+- `LLM_ENABLED`：是否启用 LLM（`1/0`）
+- `LLM_API_URL`：OpenAI 兼容接口地址
+- `LLM_API_KEY`：模型密钥
+- `LLM_MODEL`：模型名（如 `kimi-k2.6`）
+- `LLM_TIMEOUT_SECONDS`：超时秒数
+- `LLM_THINKING_TYPE`：`enabled/disabled`（Kimi K2）
+- `LLM_TEMPERATURE`：留空时按模型自动选择
+  - Kimi K2 + thinking disabled -> `0.6`
+  - Kimi K2 + thinking enabled -> `1.0`
+- `LOG_WAKE_STATUS`：是否打印 wake 轮询日志
+- `LOG_POST_PAYLOAD`：是否打印 POST payload
+- `LOG_LLM_VERBOSE`：是否打印 LLM 详细请求/响应
+
+> 建议：不要把真实 `LLM_API_KEY` 提交到仓库。
+
+---
+
+## 7. 唤醒词配置（S3 + E4）
+
+### 7.1 配置与启动
 
 ```bash
 cd /root/U2Project/Project
 conda activate task3
-./scripts/gen_wake_keywords.sh    # 写入 Project/models/keywords.txt
-# 将自录 reply.wav 放到 assets/speech/
-./scripts/stop.sh && ./scripts/run.sh
+WAKE_KEYWORD_TEXT="小龙同学" ./scripts/gen_wake_keywords.sh
+./scripts/stop.sh
+WAKE_KEYWORD_TEXT="小龙同学" ./scripts/run.sh
 ```
 
-- 关闭唤醒：`WAKE_ENABLED=0 ./scripts/run.sh`
-- 环境变量：`WAKE_REPLY_WAV`（回复音频）、`WAKE_GREETING_SECONDS`（前端展示秒数）
+### 7.2 相关变量
 
-示例（自然语言）：
-
-```bash
-curl -X POST http://127.0.0.1:8080/api/ai/command \
-  -H "Content-Type: application/json" \
-  -d '{"text":"把窗帘开到60"}'
-```
-
-示例（结构化）：
-
-```bash
-curl -X POST http://127.0.0.1:8080/api/ai/command \
-  -H "Content-Type: application/json" \
-  -d '{"command":{"device":"fan","action":"set_speed","params":{"speed":45}}}'
-```
+- `WAKE_KEYWORD_TEXT`：唤醒词
+- `WAKE_GREETING_TEXT`：唤醒后前端文案
+- `WAKE_REPLY_WAV`：回复音频路径
+- `WAKE_GREETING_SECONDS`：文案展示时长
+- `WAKE_ENABLED=0`：关闭唤醒
 
 ---
 
-## 7. 常见问题
+## 8. 排障
 
-### 1) 页面能打开，但控制无反应
+### 8.1 页面能打开但硬件无反应
 
-- 检查子板堆叠与供电
-- 检查 `/dev/i2c-*` 是否存在
-- 查看日志：
+- 检查供电和连线
+- 检查 `/dev/i2c-*`
+- 看日志：`tail -n 100 /root/U2Project/Project/logs/task1.log`
 
-```bash
-tail -n 100 /root/U2Project/Project/logs/task1.log
-```
+### 8.2 LLM 慢或超时
 
-### 2) 看到 `Remote I/O error`
+- 优先关闭 thinking：`LLM_THINKING_TYPE=disabled`
+- 适当增大超时：`LLM_TIMEOUT_SECONDS=45` 或更高
+- 开启诊断日志：`LOG_LLM_VERBOSE=1`
 
-这是 I2C 探测阶段可能出现的总线写失败提示，若关键地址设备能探测到并且元件有动作，可先按正常现象处理。
-
-### 3) 改端口启动
-
-```bash
-cd /root/U2Project/Project
-TASK1_PORT=8090 ./scripts/run.sh
-```
-
-### 4) S3 麦克风子板录音自检
+### 8.3 录音自检
 
 ```bash
 cd /root/U2Project/Project
@@ -191,42 +250,10 @@ chmod +x scripts/s3_audio_check.sh
 ./scripts/s3_audio_check.sh
 ```
 
-可选参数（秒）：
-
-```bash
-./scripts/s3_audio_check.sh 6
-```
-
-说明：
-
-- 脚本会优先使用 `tinycap`（与 S3 demo 一致），若不存在则回退 `arecord`。
-- 若已接入 E4，推荐使用 `tinyplay -D 0 -d 1 -r 16000 <wav>` 回放（与 E4 demo 一致）。
-- `/api/voice/command` 当前使用 `mock_text` 代替 ASR 结果，后续可直接替换为火山流式识别输出。
-
-### 5) E4 `tinyplay` 报错 `failed to open` 的常见原因
-
-你之前执行的是：
-
-```bash
-tinyplay -D 0 -d 1 -r 16000 /logs/audio-check/s3_xxx.wav
-```
-
-这里的路径 `/logs/...` 不存在。应使用项目真实路径，例如：
-
-```bash
-tinyplay -D 0 -d 1 -r 16000 /root/U2Project/Project/logs/audio-check/s3_20260522_161035.wav
-```
-
-或先 `cd /root/U2Project/Project` 再使用相对路径：
-
-```bash
-tinyplay -D 0 -d 1 -r 16000 logs/audio-check/s3_20260522_161035.wav
-```
-
 ---
 
-## 8. 后续可扩展方向
+## 9. 后续建议
 
-- 增加设备在线状态监测与自动重连
-- 将控制器做成单进程常驻，减少重复探测开销
-- 页面加入移动端自适应与更细粒度反馈
+- 增加“请求队列 + 取消机制”，避免并发文本请求堆积
+- 加入设备在线检测与重试策略
+- 增加对话历史与用户偏好（亮度、风扇常用档位）记忆

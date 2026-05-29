@@ -1,19 +1,17 @@
-"""唤醒状态：命中「小爱同学」→ 前端占位 + 扬声器回复（占位）。"""
+"""唤醒状态：命中唤醒词后，更新状态并触发扬声器回复。"""
 
 import os
 import threading
 import time
 from typing import Callable, Optional
 
+from project_config import get_wake_greeting_text, get_wake_idle_message, get_wake_keyword_text
 from wake_engine import SherpaWakeEngine
-
-IDLE_MSG = "等待唤醒词「小龙同学」…"
-AWAKE_GREETING = "小龙来了！"
 
 _lock = threading.Lock()
 _state = {
     "state": "idle",
-    "message": IDLE_MSG,
+    "message": get_wake_idle_message(),
     "greeting": None,
     "wake_enabled": False,
     "cooldown_until": 0.0,
@@ -39,6 +37,7 @@ def _cooldown_seconds() -> float:
 def snapshot() -> dict:
     with _lock:
         data = dict(_state)
+    data["wake_keyword_text"] = get_wake_keyword_text()
     if _engine:
         data["kws_ready"] = _engine.ready
         data["kws_listening"] = _engine.is_running()
@@ -66,9 +65,10 @@ def _handle_wake():
     try:
         if _engine:
             _engine.pause()
+        greeting = get_wake_greeting_text()
         with _lock:
-            _state.update(state="awake", message=AWAKE_GREETING, greeting=AWAKE_GREETING)
-        print(f"[project] 唤醒命中，回复占位: {AWAKE_GREETING}")
+            _state.update(state="awake", message=greeting, greeting=greeting)
+        print(f"[project] 唤醒命中，回复占位: {greeting}")
 
         if _speak_fn:
             try:
@@ -78,7 +78,12 @@ def _handle_wake():
 
         time.sleep(_display_seconds())
         with _lock:
-            _state.update(state="idle", message=IDLE_MSG, greeting=None, cooldown_until=time.time() + _cooldown_seconds())
+            _state.update(
+                state="idle",
+                message=get_wake_idle_message(),
+                greeting=None,
+                cooldown_until=time.time() + _cooldown_seconds(),
+            )
     finally:
         if _engine:
             _engine.resume()
@@ -99,8 +104,8 @@ def try_start() -> bool:
         _engine.start()
         with _lock:
             _state["wake_enabled"] = True
-            _state["message"] = IDLE_MSG
-        print("[project] 流式唤醒已启动，等待「小爱同学」")
+            _state["message"] = get_wake_idle_message()
+        print(f"[project] 流式唤醒已启动，等待「{get_wake_keyword_text()}」")
         return True
     except Exception as exc:
         print(f"[project] 唤醒启动失败: {exc}")

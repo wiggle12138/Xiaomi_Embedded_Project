@@ -8,6 +8,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "backend"))
 
+from project_config import get_wake_keyword_text  # noqa: E402
 from wake_engine import find_model_dir  # noqa: E402
 
 
@@ -27,7 +28,7 @@ def main():
         print("未找到模型，请解压到 Project/models 或 task3/models", file=sys.stderr)
         sys.exit(1)
 
-    keyword = os.environ.get("WAKE_KEYWORD_TEXT", "芮鑫龙")
+    keyword = get_wake_keyword_text()
     ensure_deps()
     from sherpa_onnx import text2token
 

@@ -8,7 +8,8 @@
 </head>
 <body>
   <div class="app-shell">
-    <aside class="sidebar">
+    <div id="sidebarBackdrop" class="sidebar-backdrop hidden" aria-hidden="true"></div>
+    <aside id="sidebar" class="sidebar">
       <div class="sidebar-title">智能中枢</div>
       <button class="nav-item active" data-view="aiView">AI中心</button>
       <button class="nav-item" data-view="modelView">模型管理</button>
@@ -20,7 +21,15 @@
       <button class="nav-item" data-view="settingView">设置</button>
     </aside>
 
-    <main class="page-scroll">
+    <div class="content-shell">
+      <header class="mobile-topbar">
+        <button type="button" id="sidebarToggleBtn" class="sidebar-toggle" aria-label="打开导航" aria-expanded="false" aria-controls="sidebar">
+          <span class="sidebar-toggle-icon" aria-hidden="true"></span>
+        </button>
+        <span class="mobile-topbar-title">智能中枢</span>
+      </header>
+
+      <main class="page-scroll">
       <section id="aiView" class="view-panel">
         <h1 class="hero-title">follow me，开启智能家庭生活</h1>
         <section id="wakeBanner" class="wake-banner">等待唤醒词…</section>
@@ -111,54 +120,18 @@
       <section id="ruleView" class="view-panel hidden">
         <div class="panel-header">
           <h2>规则管理</h2>
-          <button id="addRuleBtn">添加规则</button>
+          <button id="addRuleBtn" type="button">添加规则</button>
         </div>
-        <div class="rule-grid">
-          <article class="rule-card">
-            <div class="rule-head">
-              <h3>手势六关闭床头灯</h3>
-              <label class="switch">
-                <input type="checkbox" checked />
-                <span class="slider"></span>
-              </label>
-            </div>
-            <p>触发块：Unknown Camera</p>
-            <p>触发条件：当手势识别为“六”时</p>
-            <p>执行动作：call 设备控制（关灯）</p>
-          </article>
-          <article class="rule-card">
-            <div class="rule-head">
-              <h3>温度高于26度打开床头灯</h3>
-              <label class="switch">
-                <input type="checkbox" />
-                <span class="slider"></span>
-              </label>
-            </div>
-            <p>触发块：Unknown Sensor</p>
-            <p>触发条件：温度传感器值高于 26</p>
-            <p>执行动作：call 设备控制（开灯）</p>
-          </article>
-          <article class="rule-card">
-            <div class="rule-head">
-              <h3>光照低于50打开床头灯</h3>
-              <label class="switch">
-                <input type="checkbox" />
-                <span class="slider"></span>
-              </label>
-            </div>
-            <p>触发块：Unknown Brightness</p>
-            <p>触发条件：光照值低于 50</p>
-            <p>执行动作：call 设备控制（开灯）</p>
-          </article>
-        </div>
+        <p id="ruleSummary" class="panel-subtitle">正在加载规则...</p>
+        <div id="ruleList" class="rule-grid"></div>
       </section>
       <section id="execView" class="view-panel hidden"><h2>执行管理</h2><p class="placeholder">本阶段先保留入口，后续补齐任务队列与重试。</p></section>
       <section id="mcpView" class="view-panel hidden"><h2>MCP服务</h2><p class="placeholder">本阶段先保留入口，后续补齐MCP服务状态与管理。</p></section>
       <section id="logView" class="view-panel hidden"><h2>日志管理</h2><p class="placeholder">本阶段先保留入口，后续补齐日志查询与过滤。</p></section>
       <section id="settingView" class="view-panel hidden"><h2>设置</h2><p class="placeholder">本阶段先保留入口，后续补齐运行参数配置。</p></section>
-    </main>
+      </main>
 
-    <footer class="composer" id="composer">
+      <footer class="composer" id="composer">
       <div id="mockPanel" class="composer-mock hidden">
         <input id="voiceMockText" type="text" placeholder="mock 识别文本，留空仅录音" />
       </div>
@@ -186,7 +159,41 @@
           </button>
         </div>
       </div>
-    </footer>
+      </footer>
+    </div>
+  </div>
+
+  <div id="ruleModal" class="rule-modal hidden" aria-hidden="true">
+    <div class="rule-modal-backdrop"></div>
+    <div class="rule-modal-panel" role="dialog" aria-modal="true" aria-labelledby="ruleModalTitle">
+      <div class="rule-modal-header">
+        <h3 id="ruleModalTitle">添加规则</h3>
+        <button type="button" id="ruleModalClose" class="secondary">关闭</button>
+      </div>
+      <form id="ruleForm" class="rule-form">
+        <input type="hidden" id="ruleId" />
+        <label>规则名称<input id="ruleName" type="text" required placeholder="例如：窗帘关小后自动开灯" /></label>
+        <label>描述<textarea id="ruleDescription" rows="2" placeholder="可选说明"></textarea></label>
+        <label class="rule-inline-check"><input id="ruleEnabled" type="checkbox" checked /> 创建后启用</label>
+        <fieldset class="rule-fieldset">
+          <legend>触发条件</legend>
+          <label>触发类型
+            <select id="ruleTriggerType"></select>
+          </label>
+          <div id="ruleTriggerFields"></div>
+        </fieldset>
+        <fieldset class="rule-fieldset">
+          <legend>执行动作</legend>
+          <div id="ruleActionsBox"></div>
+          <button type="button" id="ruleAddAction" class="secondary">添加动作</button>
+        </fieldset>
+        <label>冷却时间（秒）<input id="ruleCooldown" type="number" min="0" max="3600" value="30" /></label>
+        <div class="rule-modal-footer">
+          <button type="button" id="ruleModalCancel" class="secondary">取消</button>
+          <button type="submit">保存规则</button>
+        </div>
+      </form>
+    </div>
   </div>
 
   <script type="module" src="/app.js"></script>

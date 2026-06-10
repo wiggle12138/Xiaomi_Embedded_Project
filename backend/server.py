@@ -16,6 +16,9 @@ from urllib.parse import urlparse
 import ai_adapter
 import wake_worker
 from ai_schema import normalize_command
+import rule_schema
+import rules_engine
+import rules_store
 
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
@@ -731,6 +734,56 @@ def parse_text_to_action(text, state=None):
     raise ValueError("暂不支持该自然语言指令，请改用结构化 command")
 
 
+def _enrich_rules(items):
+    return [rule_schema.enrich_rule(item) for item in items]
+
+
+def _dispatch_rules_api(method, path, payload=None):
+    """规则 REST 路由。"""
+    parts = [p for p in path.split("/") if p]
+    # api rules [id] [action]
+    if len(parts) == 2 and parts[0] == "api" and parts[1] == "rules":
+        if method == "GET":
+            return {"rules": _enrich_rules(rules_store.list_rules())}
+        if method == "POST":
+            return rule_schema.enrich_rule(rules_store.create_rule(payload or {}))
+        raise ValueError("方法不支持")
+
+    if len(parts) == 3 and parts[0] == "api" and parts[1] == "rules" and parts[2] == "meta":
+        if method == "GET":
+            return rule_schema.build_meta(_device_snapshot())
+        raise ValueError("方法不支持")
+
+    if len(parts) >= 3 and parts[0] == "api" and parts[1] == "rules":
+        rule_id = parts[2]
+        action = parts[3] if len(parts) >= 4 else None
+        if action is None:
+            if method == "GET":
+                rule = rules_store.get_rule(rule_id)
+                if not rule:
+                    raise ValueError("规则不存在")
+                return rule_schema.enrich_rule(rule)
+            if method == "PUT":
+                return rule_schema.enrich_rule(rules_store.update_rule(rule_id, payload or {}))
+            if method == "DELETE":
+                rules_store.delete_rule(rule_id)
+                return {"deleted": rule_id}
+            raise ValueError("方法不支持")
+        if action == "toggle" and method == "POST":
+            enabled = payload.get("enabled") if isinstance(payload, dict) else None
+            if enabled is None:
+                rule = rules_store.get_rule(rule_id)
+                if not rule:
+                    raise ValueError("规则不存在")
+                enabled = not bool(rule.get("enabled"))
+            return rule_schema.enrich_rule(rules_store.set_rule_enabled(rule_id, bool(enabled)))
+        if action == "run" and method == "POST":
+            return rules_engine.run_rule_by_id(rule_id)
+        raise ValueError("接口不存在")
+
+    raise ValueError("接口不存在")
+
+
 class Handler(BaseHTTPRequestHandler):
     def _send_json(self, status_code, payload):
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
@@ -783,6 +836,13 @@ class Handler(BaseHTTPRequestHandler):
             return
         if path == "/api/wake/status":
             self._send_json(200, {"ok": True, "data": wake_worker.snapshot()})
+            return
+        if path == "/api/rules" or path.startswith("/api/rules/"):
+            try:
+                result = _dispatch_rules_api("GET", path)
+                self._send_json(200, {"ok": True, "data": result})
+            except ValueError as exc:
+                self._send_json(400 if "不存在" in str(exc) else 404, {"ok": False, "error": str(exc)})
             return
 
         if path in ("/", "/index.html"):
@@ -968,12 +1028,17 @@ class Handler(BaseHTTPRequestHandler):
                 result = execute_action(action, source="voice")
                 result["audio_file"] = str(file_path)
                 result["transcript"] = transcript
+            elif path == "/api/rules" or (path.startswith("/api/rules/") and path.endswith(("/toggle", "/run"))):
+                result = _dispatch_rules_api("POST", path, payload)
+                message = result.get("message") if isinstance(result, dict) else "ok"
+                if not isinstance(message, str):
+                    message = "ok"
             else:
                 self._send_json(404, {"ok": False, "error": "接口不存在"})
                 return
             elapsed_ms = int((time.time() - started_at) * 1000)
             print(f"[project] POST {path} ok elapsed_ms={elapsed_ms}")
-            self._send_json(200, {"ok": True, "data": result, "message": result["message"]})
+            self._send_json(200, {"ok": True, "data": result, "message": result.get("message", "ok") if isinstance(result, dict) else "ok"})
         except ValueError as exc:
             elapsed_ms = int((time.time() - started_at) * 1000)
             print(f"[project] POST {path} bad_request elapsed_ms={elapsed_ms} error={exc}")
@@ -981,6 +1046,41 @@ class Handler(BaseHTTPRequestHandler):
         except Exception as exc:
             elapsed_ms = int((time.time() - started_at) * 1000)
             print(f"[project] POST {path} failed elapsed_ms={elapsed_ms} error={exc!r}")
+            print(traceback.format_exc())
+            self._send_json(500, {"ok": False, "error": str(exc)})
+
+    def do_PUT(self):
+        path = urlparse(self.path).path
+        try:
+            payload = self._read_json()
+        except json.JSONDecodeError:
+            self._send_json(400, {"ok": False, "error": "JSON 格式错误"})
+            return
+        print(f"[project] PUT {path}")
+        try:
+            if path.startswith("/api/rules/"):
+                result = _dispatch_rules_api("PUT", path, payload)
+                self._send_json(200, {"ok": True, "data": result})
+                return
+            self._send_json(404, {"ok": False, "error": "接口不存在"})
+        except ValueError as exc:
+            self._send_json(400, {"ok": False, "error": str(exc)})
+        except Exception as exc:
+            print(traceback.format_exc())
+            self._send_json(500, {"ok": False, "error": str(exc)})
+
+    def do_DELETE(self):
+        path = urlparse(self.path).path
+        print(f"[project] DELETE {path}")
+        try:
+            if path.startswith("/api/rules/"):
+                result = _dispatch_rules_api("DELETE", path)
+                self._send_json(200, {"ok": True, "data": result})
+                return
+            self._send_json(404, {"ok": False, "error": "接口不存在"})
+        except ValueError as exc:
+            self._send_json(400, {"ok": False, "error": str(exc)})
+        except Exception as exc:
             print(traceback.format_exc())
             self._send_json(500, {"ok": False, "error": str(exc)})
 
@@ -993,6 +1093,9 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main():
+    rules_store.configure(ROOT_DIR / "data" / "rules.json")
+    rules_engine.configure(execute_action=execute_action, snapshot_state=_snapshot_state)
+    rules_engine.start()
     wake_worker.set_speak_fn(speak_wake_reply)
     wake_worker.try_start()
     server = ThreadingHTTPServer((HOST, PORT), Handler)

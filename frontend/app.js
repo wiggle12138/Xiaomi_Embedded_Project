@@ -2,6 +2,7 @@ import { getJson, postJson } from "./js/api.js";
 import { createChatThread } from "./js/chat.js";
 import { refreshDevicesView } from "./js/devices.js";
 import { bindDirectControls, refreshDeviceState } from "./js/controls.js";
+import { bindRulesView, refreshRulesView } from "./js/rules.js";
 
 const state = {
   fanSpeed: document.getElementById("fanSpeed"),
@@ -14,11 +15,18 @@ const state = {
 };
 
 const wakeBanner = document.getElementById("wakeBanner");
+const sidebar = document.getElementById("sidebar");
+const sidebarBackdrop = document.getElementById("sidebarBackdrop");
+const sidebarToggleBtn = document.getElementById("sidebarToggleBtn");
 const navItems = document.querySelectorAll(".nav-item");
 const viewPanels = document.querySelectorAll(".view-panel");
 const deviceSummary = document.getElementById("deviceSummary");
 const deviceList = document.getElementById("deviceList");
 const refreshDevicesBtn = document.getElementById("refreshDevicesBtn");
+const ruleSummary = document.getElementById("ruleSummary");
+const ruleList = document.getElementById("ruleList");
+const addRuleBtn = document.getElementById("addRuleBtn");
+const ruleModal = document.getElementById("ruleModal");
 const cmdInput = document.getElementById("cmdInput");
 const cmdSendBtn = document.getElementById("cmdSendBtn");
 const pttBtn = document.getElementById("pttBtn");
@@ -41,9 +49,41 @@ let recordStartTs = 0;
 let recordTimerId = null;
 let textCommandInFlight = false;
 const MAX_RECORD_SECONDS = 60;
+const MOBILE_MEDIA = window.matchMedia("(max-width: 768px)");
 
 function setVoiceHint(text) {
   voiceHint.textContent = text;
+}
+
+function isMobileLayout() {
+  return MOBILE_MEDIA.matches;
+}
+
+function setSidebarOpen(open) {
+  if (!sidebar || !sidebarBackdrop || !sidebarToggleBtn) return;
+  sidebar.classList.toggle("open", open);
+  sidebarBackdrop.classList.toggle("hidden", !open);
+  sidebarBackdrop.setAttribute("aria-hidden", open ? "false" : "true");
+  sidebarToggleBtn.setAttribute("aria-expanded", open ? "true" : "false");
+  sidebarToggleBtn.setAttribute("aria-label", open ? "关闭导航" : "打开导航");
+  document.body.classList.toggle("sidebar-open", open);
+}
+
+function closeSidebar() {
+  setSidebarOpen(false);
+}
+
+function toggleSidebar() {
+  if (!sidebar) return;
+  setSidebarOpen(!sidebar.classList.contains("open"));
+}
+
+function notifyRuleMessage(message, level = "ok") {
+  if (level === "error") {
+    chat.error(message);
+  } else {
+    chat.assistantText(message);
+  }
 }
 
 function showView(viewId) {
@@ -52,6 +92,12 @@ function showView(viewId) {
   navItems.forEach((item) => item.classList.toggle("active", item.dataset.view === viewId));
   if (viewId === "deviceView") {
     refreshDevicesView({ summaryEl: deviceSummary, listEl: deviceList });
+  }
+  if (viewId === "ruleView") {
+    refreshRulesView({ listEl: ruleList, summaryEl: ruleSummary, onNotify: notifyRuleMessage });
+  }
+  if (isMobileLayout()) {
+    closeSidebar();
   }
 }
 
@@ -178,7 +224,27 @@ bindDirectControls(
 );
 
 navItems.forEach((item) => item.addEventListener("click", () => showView(item.dataset.view)));
+if (sidebarToggleBtn) sidebarToggleBtn.addEventListener("click", toggleSidebar);
+if (sidebarBackdrop) sidebarBackdrop.addEventListener("click", closeSidebar);
+if (MOBILE_MEDIA.addEventListener) {
+  MOBILE_MEDIA.addEventListener("change", (event) => {
+    if (!event.matches) closeSidebar();
+  });
+} else if (MOBILE_MEDIA.addListener) {
+  MOBILE_MEDIA.addListener((event) => {
+    if (!event.matches) closeSidebar();
+  });
+}
 if (refreshDevicesBtn) refreshDevicesBtn.addEventListener("click", () => refreshDevicesView({ summaryEl: deviceSummary, listEl: deviceList }));
+
+bindRulesView({
+  listEl: ruleList,
+  summaryEl: ruleSummary,
+  addBtn: addRuleBtn,
+  modal: ruleModal,
+  onNotify: notifyRuleMessage,
+  onDeviceRefresh: () => refreshDeviceState(state),
+});
 
 cmdSendBtn.addEventListener("click", submitTextCommand);
 cmdInput.addEventListener("keydown", (event) => {

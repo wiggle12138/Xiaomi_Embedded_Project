@@ -1,0 +1,133 @@
+{
+  "rules": [
+    {
+      "id": "rule_demo_gesture",
+      "name": "手势六关闭床头灯",
+      "description": "摄像头识别手势「六」时关灯",
+      "enabled": false,
+      "trigger": {
+        "type": "camera_gesture",
+        "gesture": "六"
+      },
+      "actions": [
+        {
+          "device": "light",
+          "action": "off",
+          "params": {}
+        }
+      ],
+      "options": {
+        "cooldown_seconds": 30
+      },
+      "created_at": "2026-06-10T16:01:32",
+      "updated_at": "2026-06-10T16:01:32",
+      "last_run_at": null,
+      "last_run_status": "pending",
+      "last_run_message": "触发源待接入"
+    },
+    {
+      "id": "rule_demo_temperature",
+      "name": "温度高于26度打开床头灯",
+      "description": "温度传感器高于 26 时开灯",
+      "enabled": false,
+      "trigger": {
+        "type": "temperature",
+        "operator": "gt",
+        "value": 26
+      },
+      "actions": [
+        {
+          "device": "light",
+          "action": "on",
+          "params": {}
+        }
+      ],
+      "options": {
+        "cooldown_seconds": 30
+      },
+      "created_at": "2026-06-10T16:01:32",
+      "updated_at": "2026-06-10T16:01:32",
+      "last_run_at": null,
+      "last_run_status": "pending",
+      "last_run_message": "触发源待接入"
+    },
+    {
+      "id": "rule_demo_brightness",
+      "name": "光照低于50打开床头灯",
+      "description": "光照传感器低于 50 时开灯",
+      "enabled": false,
+      "trigger": {
+        "type": "brightness_sensor",
+        "operator": "lt",
+        "value": 50
+      },
+      "actions": [
+        {
+          "device": "light",
+          "action": "on",
+          "params": {}
+        }
+      ],
+      "options": {
+        "cooldown_seconds": 30
+      },
+      "created_at": "2026-06-10T16:01:32",
+      "updated_at": "2026-06-10T16:01:32",
+      "last_run_at": null,
+      "last_run_status": "pending",
+      "last_run_message": "触发源待接入"
+    },
+    {
+      "id": "rule_demo_curtain_light",
+      "name": "窗帘关小后自动开灯",
+      "description": "窗帘开度低于 20 时自动开灯",
+      "enabled": false,
+      "trigger": {
+        "type": "device_state",
+        "device": "curtain",
+        "field": "position",
+        "operator": "lt",
+        "value": 20
+      },
+      "actions": [
+        {
+          "device": "light",
+          "action": "on",
+          "params": {}
+        }
+      ],
+      "options": {
+        "cooldown_seconds": 30
+      },
+      "created_at": "2026-06-10T16:01:32",
+      "updated_at": "2026-06-10T16:01:32",
+      "last_run_at": null,
+      "last_run_status": "idle",
+      "last_run_message": ""
+    },
+    {
+      "id": "rule_6778867ebf",
+      "name": "API测试",
+      "description": "",
+      "enabled": true,
+      "trigger": {
+        "type": "manual"
+      },
+      "actions": [
+        {
+          "device": "light",
+          "action": "off",
+          "params": {}
+        }
+      ],
+      "options": {
+        "cooldown_seconds": 30
+      },
+      "created_at": "2026-06-10T16:01:34",
+      "updated_at": "2026-06-10T16:03:05",
+      "last_run_at": "2026-06-10T16:03:05",
+      "last_run_status": "ok",
+      "last_run_message": "灯已关闭"
+    }
+  ]
+}

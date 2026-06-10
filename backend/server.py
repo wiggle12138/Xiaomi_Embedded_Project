@@ -43,6 +43,45 @@ VOICE_SESSION = {
     "max_seconds": 0,
     "rate": 16000,
 }
+DEVICE_RUNTIME_LOCK = threading.Lock()
+DEVICE_RUNTIME = {
+    "S1": {"status": "idle", "last_seen": None, "last_error": ""},
+    "E1": {"status": "idle", "last_seen": None, "last_error": ""},
+    "E2": {"status": "idle", "last_seen": None, "last_error": ""},
+    "E3": {"status": "idle", "last_seen": None, "last_error": ""},
+    "S3": {"status": "idle", "last_seen": None, "last_error": ""},
+    "E4": {"status": "idle", "last_seen": None, "last_error": ""},
+    "S4": {"status": "idle", "last_seen": None, "last_error": ""},
+}
+I2C_SCAN_CACHE_LOCK = threading.Lock()
+I2C_SCAN_CACHE = {"ts": 0.0, "buses": {}}
+I2C_SCAN_TTL_SECONDS = 3.0
+
+
+def _now_iso():
+    return datetime.now().isoformat(timespec="seconds")
+
+
+def _mark_device_success(device_id):
+    if not device_id:
+        return
+    with DEVICE_RUNTIME_LOCK:
+        if device_id not in DEVICE_RUNTIME:
+            return
+        DEVICE_RUNTIME[device_id]["status"] = "idle"
+        DEVICE_RUNTIME[device_id]["last_seen"] = _now_iso()
+        DEVICE_RUNTIME[device_id]["last_error"] = ""
+
+
+def _mark_device_error(device_id, error):
+    if not device_id:
+        return
+    with DEVICE_RUNTIME_LOCK:
+        if device_id not in DEVICE_RUNTIME:
+            return
+        DEVICE_RUNTIME[device_id]["status"] = "error"
+        DEVICE_RUNTIME[device_id]["last_seen"] = _now_iso()
+        DEVICE_RUNTIME[device_id]["last_error"] = str(error)
 
 
 def clamp(value: int, min_value: int, max_value: int) -> int:
@@ -112,8 +151,9 @@ def record_audio(seconds=3, rate=16000):
 
     if proc.returncode != 0:
         err = proc.stderr.strip() or proc.stdout.strip() or "录音失败"
+        _mark_device_error("S3", err)
         raise RuntimeError(err)
-
+    _mark_device_success("S3")
     return out_path
 
 
@@ -146,7 +186,9 @@ def playback_audio(audio_path):
 
     if proc.returncode != 0:
         err = proc.stderr.strip() or proc.stdout.strip() or "回放失败"
+        _mark_device_error("E4", err)
         raise RuntimeError(err)
+    _mark_device_success("E4")
     return True
 
 
@@ -165,6 +207,195 @@ def latest_audio_file():
         return None
     files = sorted([p for p in AUDIO_DIR.glob("*.wav") if p.is_file()], key=lambda p: p.stat().st_mtime, reverse=True)
     return files[0] if files else None
+
+
+def _runtime_of(device_id):
+    with DEVICE_RUNTIME_LOCK:
+        return dict(DEVICE_RUNTIME.get(device_id, {}))
+
+
+def _detect_i2c_device_nodes():
+    nodes = sorted(Path("/dev").glob("i2c-*"))
+    buses = []
+    for node in nodes:
+        suffix = node.name.replace("i2c-", "")
+        if suffix.isdigit():
+            buses.append(int(suffix))
+    return buses
+
+
+def _parse_i2cdetect_output(raw):
+    present = set()
+    for line in raw.splitlines():
+        line = line.strip()
+        if not line or ":" not in line:
+            continue
+        if line.startswith("Error"):
+            continue
+        _, rhs = line.split(":", 1)
+        for token in rhs.split():
+            token = token.strip().lower()
+            if len(token) == 2 and all(c in "0123456789abcdef" for c in token):
+                present.add(int(token, 16))
+    return present
+
+
+def _scan_i2c_addrs():
+    now = time.time()
+    with I2C_SCAN_CACHE_LOCK:
+        if now - I2C_SCAN_CACHE["ts"] <= I2C_SCAN_TTL_SECONDS:
+            return dict(I2C_SCAN_CACHE["buses"])
+
+    if not shutil.which("i2cdetect"):
+        # 无 i2cdetect 时返回空，避免误判在线。
+        return {}
+
+    buses = _detect_i2c_device_nodes()
+    result = {}
+    for bus in buses:
+        cmd = ["i2cdetect", "-y", "-a", str(bus)]
+        try:
+            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=2)
+        except Exception:
+            continue
+        if proc.returncode != 0:
+            continue
+        result[bus] = _parse_i2cdetect_output(proc.stdout)
+
+    with I2C_SCAN_CACHE_LOCK:
+        I2C_SCAN_CACHE["ts"] = now
+        I2C_SCAN_CACHE["buses"] = dict(result)
+    return result
+
+
+def _i2c_target_present(scan_map, candidate_addrs):
+    if not scan_map:
+        return False
+    target = set(candidate_addrs)
+    for found in scan_map.values():
+        if target.intersection(found):
+            return True
+    return False
+
+
+def _device_snapshot():
+    wake = wake_worker.snapshot()
+    voice = _voice_snapshot()
+    i2c_scan = _scan_i2c_addrs()
+
+    # 对齐 E1-demo i2c_probe.cpp 的候选地址（7-bit）。
+    addr_s1_keys = [0x74, 0x75, 0x76, 0x77]
+    addr_e1_light = [0x60, 0x61, 0x62, 0x63]
+    addr_e1_display = [0x70, 0x71, 0x72, 0x73]
+    addr_e2_fan = [0x64, 0x65, 0x66, 0x67]
+    addr_e3_motor = [0x1C, 0x1D, 0x1E, 0x1F]
+
+    s1_runtime = _runtime_of("S1")
+    e1_runtime = _runtime_of("E1")
+    e2_runtime = _runtime_of("E2")
+    e3_runtime = _runtime_of("E3")
+    s3_runtime = _runtime_of("S3")
+    e4_runtime = _runtime_of("E4")
+    s4_runtime = _runtime_of("S4")
+
+    s3_status = "busy" if voice["active"] or wake.get("kws_listening") else s3_runtime.get("status", "idle")
+    s3_online = (shutil.which("tinycap") or shutil.which("arecord")) and Path("/dev/snd").exists()
+    e4_online = (shutil.which("tinyplay") or shutil.which("aplay")) and Path("/dev/snd").exists()
+    s4_online = Path(f"/dev/video{str(os.environ.get('S4_VIDEO_DEVICE', '8'))}").exists()
+
+    devices = [
+        {
+            "device_id": "S1",
+            "name": "按键子板",
+            "type": "key",
+            "online": bool(_i2c_target_present(i2c_scan, addr_s1_keys)),
+            "status": s1_runtime.get("status", "idle"),
+            "capabilities": ["key.read"],
+            "last_seen": s1_runtime.get("last_seen"),
+            "last_error": s1_runtime.get("last_error", ""),
+        },
+        {
+            "device_id": "E1",
+            "name": "灯光子板",
+            "type": "light",
+            "online": bool(_i2c_target_present(i2c_scan, addr_e1_light + addr_e1_display)),
+            "status": e1_runtime.get("status", "idle"),
+            "capabilities": ["light.on", "light.off", "light.set_rgb", "light.set_brightness"],
+            "last_seen": e1_runtime.get("last_seen"),
+            "last_error": e1_runtime.get("last_error", ""),
+        },
+        {
+            "device_id": "E2",
+            "name": "风扇子板",
+            "type": "fan",
+            "online": bool(_i2c_target_present(i2c_scan, addr_e2_fan)),
+            "status": e2_runtime.get("status", "idle"),
+            "capabilities": ["fan.on", "fan.off", "fan.set_speed"],
+            "last_seen": e2_runtime.get("last_seen"),
+            "last_error": e2_runtime.get("last_error", ""),
+        },
+        {
+            "device_id": "E3",
+            "name": "窗帘子板",
+            "type": "curtain",
+            "online": bool(_i2c_target_present(i2c_scan, addr_e3_motor)),
+            "status": e3_runtime.get("status", "idle"),
+            "capabilities": ["curtain.open", "curtain.close", "curtain.set_position"],
+            "last_seen": e3_runtime.get("last_seen"),
+            "last_error": e3_runtime.get("last_error", ""),
+        },
+        {
+            "device_id": "S3",
+            "name": "麦克风子板",
+            "type": "mic",
+            "online": bool(s3_online),
+            "status": s3_status,
+            "capabilities": ["voice.record", "wake.listen"],
+            "last_seen": s3_runtime.get("last_seen"),
+            "last_error": s3_runtime.get("last_error", ""),
+        },
+        {
+            "device_id": "E4",
+            "name": "扬声器子板",
+            "type": "speaker",
+            "online": bool(e4_online),
+            "status": e4_runtime.get("status", "idle"),
+            "capabilities": ["voice.playback", "wake.reply"],
+            "last_seen": e4_runtime.get("last_seen"),
+            "last_error": e4_runtime.get("last_error", ""),
+        },
+        {
+            "device_id": "S4",
+            "name": "摄像头子板",
+            "type": "camera",
+            "online": bool(s4_online),
+            "status": s4_runtime.get("status", "idle"),
+            "capabilities": ["vision.detect"],
+            "last_seen": s4_runtime.get("last_seen"),
+            "last_error": s4_runtime.get("last_error", ""),
+        },
+    ]
+
+    for d in devices:
+        if not d["online"] and d["status"] != "error":
+            d["status"] = "offline"
+
+    summary = {
+        "total": len(devices),
+        "online": sum(1 for d in devices if d["online"]),
+        "offline": sum(1 for d in devices if not d["online"]),
+        "error": sum(1 for d in devices if d["status"] == "error"),
+        "busy": sum(1 for d in devices if d["status"] == "busy"),
+    }
+    return {
+        "summary": summary,
+        "devices": devices,
+        "updated_at": _now_iso(),
+        "probe": {
+            "i2c_tool": bool(shutil.which("i2cdetect")),
+            "i2c_buses_scanned": sorted(list(i2c_scan.keys())),
+        },
+    }
 
 
 def _voice_snapshot():
@@ -239,6 +470,7 @@ def start_voice_session(max_seconds=60, rate=16000):
         VOICE_SESSION["max_seconds"] = max_seconds
         VOICE_SESSION["rate"] = rate
 
+    _mark_device_success("S3")
     threading.Thread(target=_voice_auto_stop_worker, daemon=True).start()
     return out_path
 
@@ -264,6 +496,7 @@ def stop_voice_session():
     duration = max(0.0, time.time() - start_ts)
     if not out_path or not Path(out_path).exists():
         raise RuntimeError("录音文件未生成，请重试")
+    _mark_device_success("S3")
     return Path(out_path), duration
 
 
@@ -367,45 +600,52 @@ def execute_action(action, source="structured"):
         raise ValueError("params 必须是 JSON 对象")
 
     message = None
+    board_map = {"light": "E1", "fan": "E2", "curtain": "E3"}
+    board_id = board_map.get(device)
+    try:
+        if device == "fan":
+            if act == "on":
+                message = do_fan_power(True)
+            elif act == "off":
+                message = do_fan_power(False)
+            elif act == "set_speed":
+                speed = params.get("speed", 0)
+                message = do_fan_speed(speed)
+            else:
+                raise ValueError("fan action 不支持")
+        elif device == "light":
+            if act == "on":
+                message = do_light_power(True)
+            elif act == "off":
+                message = do_light_power(False)
+            elif act == "set_rgb":
+                message = do_light_rgb(
+                    r=params.get("r"),
+                    g=params.get("g"),
+                    b=params.get("b"),
+                    brightness=params.get("brightness"),
+                )
+            elif act == "set_brightness":
+                message = do_light_rgb(brightness=params.get("brightness"))
+            else:
+                raise ValueError("light action 不支持")
+        elif device == "curtain":
+            if act == "open":
+                message = do_curtain_position(100)
+            elif act == "close":
+                message = do_curtain_position(0)
+            elif act == "set_position":
+                position = params.get("position", 0)
+                message = do_curtain_position(position)
+            else:
+                raise ValueError("curtain action 不支持")
+        else:
+            raise ValueError("device 不支持")
+    except Exception as exc:
+        _mark_device_error(board_id, exc)
+        raise
 
-    if device == "fan":
-        if act == "on":
-            message = do_fan_power(True)
-        elif act == "off":
-            message = do_fan_power(False)
-        elif act == "set_speed":
-            speed = params.get("speed", 0)
-            message = do_fan_speed(speed)
-        else:
-            raise ValueError("fan action 不支持")
-    elif device == "light":
-        if act == "on":
-            message = do_light_power(True)
-        elif act == "off":
-            message = do_light_power(False)
-        elif act == "set_rgb":
-            message = do_light_rgb(
-                r=params.get("r"),
-                g=params.get("g"),
-                b=params.get("b"),
-                brightness=params.get("brightness"),
-            )
-        elif act == "set_brightness":
-            message = do_light_rgb(brightness=params.get("brightness"))
-        else:
-            raise ValueError("light action 不支持")
-    elif device == "curtain":
-        if act == "open":
-            message = do_curtain_position(100)
-        elif act == "close":
-            message = do_curtain_position(0)
-        elif act == "set_position":
-            position = params.get("position", 0)
-            message = do_curtain_position(position)
-        else:
-            raise ValueError("curtain action 不支持")
-    else:
-        raise ValueError("device 不支持")
+    _mark_device_success(board_id)
 
     return {
         "source": source,
@@ -531,6 +771,9 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/state":
             self._send_json(200, {"ok": True, "data": _snapshot_state()})
             return
+        if path == "/api/devices":
+            self._send_json(200, {"ok": True, "data": _device_snapshot()})
+            return
         if path == "/api/voice/latest":
             latest = latest_audio_file()
             self._send_json(200, {"ok": True, "data": {"audio_file": str(latest) if latest else None}})
@@ -551,6 +794,11 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/style.css":
             self._serve_file(FRONTEND_DIR / "style.css")
             return
+        if path.startswith("/js/"):
+            target = (FRONTEND_DIR / path.lstrip("/")).resolve()
+            if str(target).startswith(str(FRONTEND_DIR.resolve())):
+                self._serve_file(target)
+                return
 
         self.send_error(404, "Not Found")
 

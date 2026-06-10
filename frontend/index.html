@@ -7,73 +7,157 @@
   <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
-  <div class="page">
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="sidebar-title">智能中枢</div>
+      <button class="nav-item active" data-view="aiView">AI中心</button>
+      <button class="nav-item" data-view="modelView">模型管理</button>
+      <button class="nav-item" data-view="ruleView">规则管理</button>
+      <button class="nav-item" data-view="execView">执行管理</button>
+      <button class="nav-item" data-view="mcpView">MCP服务</button>
+      <button class="nav-item" data-view="deviceView">设备管理</button>
+      <button class="nav-item" data-view="logView">日志管理</button>
+      <button class="nav-item" data-view="settingView">设置</button>
+    </aside>
+
     <main class="page-scroll">
-      <h1>智能环境控制台</h1>
+      <section id="aiView" class="view-panel">
+        <h1 class="hero-title">follow me，开启智能家庭生活</h1>
+        <section id="wakeBanner" class="wake-banner">等待唤醒词…</section>
 
-      <section id="wakeBanner" class="wake-banner">等待唤醒词…</section>
+        <section class="quick-grid">
+          <article class="quick-card"><h3>随时提问</h3><p>看看当前设备都是什么状态</p></article>
+          <article class="quick-card"><h3>创建规则</h3><p>当有人在家时，打开灯并调节窗帘</p></article>
+          <article class="quick-card"><h3>复杂控制</h3><p>通过一句话完成多设备联动控制</p></article>
+          <article class="quick-card"><h3>动态推理</h3><p>自然语言输入后，系统自动选择规则或LLM分支</p></article>
+        </section>
 
-      <section class="card">
-        <h2>E2 风扇</h2>
-        <div class="row">
-          <button id="fanOnBtn">开启风扇</button>
-          <button id="fanOffBtn" class="secondary">关闭风扇</button>
-        </div>
-        <div class="row">
-          <label for="fanSpeed">速度: <span id="fanSpeedValue">30</span></label>
-        </div>
-        <div class="row">
-          <input id="fanSpeed" type="range" min="0" max="100" value="30" />
-          <button id="fanSetBtn">设置速度</button>
-        </div>
+        <section class="card-grid">
+          <section class="card">
+            <h2>E2 风扇</h2>
+            <div class="row">
+              <button id="fanOnBtn">开启风扇</button>
+              <button id="fanOffBtn" class="secondary">关闭风扇</button>
+            </div>
+            <div class="row">
+              <label for="fanSpeed">速度: <span id="fanSpeedValue">30</span></label>
+            </div>
+            <div class="row">
+              <input id="fanSpeed" type="range" min="0" max="100" value="30" />
+              <button id="fanSetBtn">设置速度</button>
+            </div>
+          </section>
+
+          <section class="card">
+            <h2>E1 灯光</h2>
+            <div class="row">
+              <button id="lightOnBtn">开灯</button>
+              <button id="lightOffBtn" class="secondary">关灯</button>
+            </div>
+            <div class="row">
+              <label>预设颜色:</label>
+            </div>
+            <div class="row wrap">
+              <button class="color-btn" data-r="255" data-g="0" data-b="0">红</button>
+              <button class="color-btn" data-r="0" data-g="255" data-b="0">绿</button>
+              <button class="color-btn" data-r="0" data-g="0" data-b="255">蓝</button>
+              <button class="color-btn" data-r="255" data-g="255" data-b="255">白</button>
+              <button class="color-btn" data-r="255" data-g="128" data-b="0">橙</button>
+            </div>
+            <div class="row">
+              <label for="lightBrightness">亮度: <span id="lightBrightnessValue">100</span></label>
+            </div>
+            <div class="row">
+              <input id="lightBrightness" type="range" min="0" max="100" value="100" />
+            </div>
+          </section>
+
+          <section class="card">
+            <h2>E3 窗帘</h2>
+            <div class="row">
+              <button id="curtainOpenBtn">全开</button>
+              <button id="curtainCloseBtn" class="secondary">全关</button>
+            </div>
+            <div class="row">
+              <label for="curtainPos">开度: <span id="curtainPosValue">0</span></label>
+            </div>
+            <div class="row">
+              <input id="curtainPos" type="range" min="0" max="100" value="0" />
+              <button id="curtainSetBtn">设置开度</button>
+            </div>
+          </section>
+
+          <section class="card">
+            <h2>对话执行流</h2>
+            <div id="chatThread" class="chat-thread">
+              <div class="chat-row assistant">
+                <div class="chat-bubble">你好，我已准备好控制设备。你可以直接说“把灯调成暖色，亮度60”。</div>
+              </div>
+            </div>
+          </section>
+        </section>
       </section>
 
-      <section class="card">
-        <h2>E1 灯光</h2>
-        <div class="row">
-          <button id="lightOnBtn">开灯</button>
-          <button id="lightOffBtn" class="secondary">关灯</button>
+      <section id="deviceView" class="view-panel hidden">
+        <div class="panel-header">
+          <h2>设备管理</h2>
+          <button id="refreshDevicesBtn">刷新设备状态</button>
         </div>
-        <div class="row">
-          <label>预设颜色:</label>
-        </div>
-        <div class="row wrap">
-          <button class="color-btn" data-r="255" data-g="0" data-b="0">红</button>
-          <button class="color-btn" data-r="0" data-g="255" data-b="0">绿</button>
-          <button class="color-btn" data-r="0" data-g="0" data-b="255">蓝</button>
-          <button class="color-btn" data-r="255" data-g="255" data-b="255">白</button>
-          <button class="color-btn" data-r="255" data-g="128" data-b="0">橙</button>
-        </div>
-        <div class="row">
-          <label for="lightBrightness">亮度: <span id="lightBrightnessValue">100</span></label>
-        </div>
-        <div class="row">
-          <input id="lightBrightness" type="range" min="0" max="100" value="100" />
-        </div>
+        <p id="deviceSummary" class="panel-subtitle">正在加载设备状态...</p>
+        <div id="deviceList" class="device-grid"></div>
       </section>
 
-      <section class="card">
-        <h2>E3 窗帘</h2>
-        <div class="row">
-          <button id="curtainOpenBtn">全开</button>
-          <button id="curtainCloseBtn" class="secondary">全关</button>
+      <section id="modelView" class="view-panel hidden"><h2>模型管理</h2><p class="placeholder">本阶段先保留入口，后续补齐模型配置与统计。</p></section>
+      <section id="ruleView" class="view-panel hidden">
+        <div class="panel-header">
+          <h2>规则管理</h2>
+          <button id="addRuleBtn">添加规则</button>
         </div>
-        <div class="row">
-          <label for="curtainPos">开度: <span id="curtainPosValue">0</span></label>
-        </div>
-        <div class="row">
-          <input id="curtainPos" type="range" min="0" max="100" value="0" />
-          <button id="curtainSetBtn">设置开度</button>
+        <div class="rule-grid">
+          <article class="rule-card">
+            <div class="rule-head">
+              <h3>手势六关闭床头灯</h3>
+              <label class="switch">
+                <input type="checkbox" checked />
+                <span class="slider"></span>
+              </label>
+            </div>
+            <p>触发块：Unknown Camera</p>
+            <p>触发条件：当手势识别为“六”时</p>
+            <p>执行动作：call 设备控制（关灯）</p>
+          </article>
+          <article class="rule-card">
+            <div class="rule-head">
+              <h3>温度高于26度打开床头灯</h3>
+              <label class="switch">
+                <input type="checkbox" />
+                <span class="slider"></span>
+              </label>
+            </div>
+            <p>触发块：Unknown Sensor</p>
+            <p>触发条件：温度传感器值高于 26</p>
+            <p>执行动作：call 设备控制（开灯）</p>
+          </article>
+          <article class="rule-card">
+            <div class="rule-head">
+              <h3>光照低于50打开床头灯</h3>
+              <label class="switch">
+                <input type="checkbox" />
+                <span class="slider"></span>
+              </label>
+            </div>
+            <p>触发块：Unknown Brightness</p>
+            <p>触发条件：光照值低于 50</p>
+            <p>执行动作：call 设备控制（开灯）</p>
+          </article>
         </div>
       </section>
-
-      <section class="card">
-        <h2>状态</h2>
-        <pre id="statusBox">等待操作...</pre>
-      </section>
+      <section id="execView" class="view-panel hidden"><h2>执行管理</h2><p class="placeholder">本阶段先保留入口，后续补齐任务队列与重试。</p></section>
+      <section id="mcpView" class="view-panel hidden"><h2>MCP服务</h2><p class="placeholder">本阶段先保留入口，后续补齐MCP服务状态与管理。</p></section>
+      <section id="logView" class="view-panel hidden"><h2>日志管理</h2><p class="placeholder">本阶段先保留入口，后续补齐日志查询与过滤。</p></section>
+      <section id="settingView" class="view-panel hidden"><h2>设置</h2><p class="placeholder">本阶段先保留入口，后续补齐运行参数配置。</p></section>
     </main>
 
-    <!-- 底部固定输入栏：文字 / 语音 二选一 -->
     <footer class="composer" id="composer">
       <div id="mockPanel" class="composer-mock hidden">
         <input id="voiceMockText" type="text" placeholder="mock 识别文本，留空仅录音" />
@@ -84,7 +168,6 @@
           <span class="icon-voice" aria-hidden="true"></span>
           <span class="icon-keyboard hidden" aria-hidden="true"></span>
         </button>
-
         <div class="composer-main">
           <div id="textPanel" class="composer-panel">
             <input id="cmdInput" type="text" placeholder="输入控制指令，如：打开窗帘" />
@@ -94,7 +177,6 @@
             <button type="button" id="pttBtn" class="ptt-btn">按住 说话</button>
           </div>
         </div>
-
         <div class="composer-tools">
           <button type="button" id="voicePlayBtn" class="icon-btn" title="回放最新录音" aria-label="回放最新录音">
             <span class="icon-play" aria-hidden="true"></span>
@@ -107,6 +189,6 @@
     </footer>
   </div>
 
-  <script src="/app.js"></script>
+  <script type="module" src="/app.js"></script>
 </body>
 </html>

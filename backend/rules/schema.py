@@ -2,7 +2,7 @@
 
 from typing import Any, Dict, List, Optional
 
-from ai_schema import SUPPORTED_ACTIONS, normalize_command
+from ai.schema import SUPPORTED_ACTIONS, normalize_command
 
 # 触发类型：implemented 表示引擎 V1 是否已接入
 TRIGGER_TYPES = {

@@ -4,7 +4,7 @@ import time
 from typing import Any, Dict
 from urllib import error, request
 
-from ai_schema import normalize_command
+from ai.schema import normalize_command
 
 
 def _llm_enabled() -> bool:

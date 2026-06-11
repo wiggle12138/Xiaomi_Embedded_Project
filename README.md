@@ -52,19 +52,44 @@ cd /root/U2Project/Project
 
 ```text
 Project/
-  backend/server.py         # HTTP 服务与路由
-  backend/ai_adapter.py     # LLM 请求与结果解析
-  backend/ai_schema.py      # command 白名单与参数校验
-  backend/wake_worker.py    # 唤醒状态管理
-  backend/wake_engine.py    # KWS 引擎（sherpa-onnx + arecord）
-  frontend/index.html
-  frontend/app.js
-  frontend/style.css
-  native/                   # e1_ctl / e2_ctl / e3_ctl
+  backend/
+    server.py                 # HTTP 入口与路由编排
+    config/
+      paths.py                # ROOT_DIR、FRONTEND_DIR、BIN_DIR 等
+      project_config.py       # 唤醒词等运行配置
+      util.py                 # 通用工具（clamp 等）
+    ai/
+      adapter.py              # Kimi LLM 请求与结果解析
+      schema.py               # command 白名单与参数校验
+    device/
+      runtime.py              # 子板运行时状态（在线/异常）
+      actions.py              # STATE、execute_action、文本直解析
+      probe.py                # I2C 探测、device_snapshot
+    voice/
+      audio_io.py             # S3 录音、E4 回放、按住说话会话
+      wake_engine.py          # KWS 引擎（sherpa-onnx + arecord）
+      wake_worker.py          # 唤醒状态管理
+    rules/
+      schema.py               # 规则结构校验与 meta
+      store.py                # rules.json 持久化
+      engine.py               # 规则引擎（设备状态轮询 + 手动触发）
+  frontend/
+    index.html
+    app.js
+    style.css
+    js/
+      api.js
+      chat.js
+      controls.js
+      devices.js
+      rules.js
+  data/
+    rules.json                # 规则持久化（运行时生成/更新）
+  native/                     # e1_ctl / e2_ctl / e3_ctl
   scripts/run.sh
   scripts/stop.sh
   scripts/gen_wake_keywords.sh
-  logs/                     # 启动后自动生成
+  logs/                       # 启动后自动生成
 ```
 
 ---
@@ -92,6 +117,16 @@ Project/
 - 动作：例如 `light.on`
 - LLM 思考时间（仅 LLM 分支）
 - 最终执行结果
+
+### 3.4 规则管理
+
+- 左侧导航进入「规则管理」：添加/编辑/删除规则，启停与手动测试。
+- 触发 V1：`manual`（测试运行）、`device_state`（设备状态轮询）。
+- 执行动作：先选设备（灯光 E1 / 风扇 E2 / 窗帘 E3），再选具体动作；未在线子板对应项置灰。
+
+### 3.5 手机布局
+
+- 视口宽度 ≤768px 时，左上角按钮唤出侧栏抽屉；PC 端保持固定侧栏。
 
 ---
 
@@ -127,6 +162,17 @@ Project/
 - `POST /api/voice/command` body: `{"seconds":3,"mock_text":"打开窗帘"}`
 - `GET /api/wake/status`
 
+### 4.4 规则管理
+
+- `GET /api/rules`：规则列表
+- `GET /api/rules/meta`：触发类型、执行动作、在线设备（供表单）
+- `GET/PUT/DELETE /api/rules/{id}`
+- `POST /api/rules`：创建规则
+- `POST /api/rules/{id}/toggle` body: `{"enabled": true|false}`
+- `POST /api/rules/{id}/run`：手动测试运行
+
+持久化文件：`data/rules.json`
+
 ---
 
 ## 5. LLM 设计说明（自然语言 -> 设备动作）
@@ -144,7 +190,7 @@ Project/
    - 当前设备状态（`STATE`）
    - 用户文本
 4. LLM 返回结构化 JSON（command）
-5. 后端用 `ai_schema` 做白名单和参数校验
+5. 后端用 `ai/schema.py` 做白名单和参数校验
 6. 统一调用 `execute_action()` 执行硬件控制
 7. 返回前端结果并展示在状态栏
 
@@ -254,6 +300,8 @@ chmod +x scripts/s3_audio_check.sh
 
 ## 9. 后续建议
 
-- 增加“请求队列 + 取消机制”，避免并发文本请求堆积
-- 加入设备在线检测与重试策略
-- 增加对话历史与用户偏好（亮度、风扇常用档位）记忆
+- 语音：火山 ASR + TTS，对话会话状态机（小爱模式）
+- 视觉：S4 抓帧 + 火山多模态手势 → 规则触发
+- 增加「请求队列 + 取消机制」，避免并发文本请求堆积
+- 设备管理增加诊断入口（重新探测、关键错误）
+- 执行管理 / 日志管理 / 模型管理页补齐

@@ -5,8 +5,8 @@ import threading
 import time
 from typing import Callable, Optional
 
-from project_config import get_wake_greeting_text, get_wake_idle_message, get_wake_keyword_text
-from wake_engine import SherpaWakeEngine
+from config.project_config import get_wake_greeting_text, get_wake_idle_message, get_wake_keyword_text
+from voice.wake_engine import SherpaWakeEngine
 
 _lock = threading.Lock()
 _state = {

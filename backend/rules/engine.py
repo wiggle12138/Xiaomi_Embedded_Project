@@ -4,7 +4,7 @@ import threading
 import time
 from typing import Any, Callable, Dict, List, Optional
 
-from rule_schema import TRIGGER_TYPES, validate_actions
+from rules.schema import TRIGGER_TYPES, validate_actions
 
 ENGINE_LOCK = threading.Lock()
 ENGINE_THREAD: Optional[threading.Thread] = None
@@ -111,7 +111,7 @@ def execute_rule_actions(rule: Dict[str, Any], *, source: str = "rule") -> Dict[
 
 
 def run_rule(rule: Dict[str, Any], *, source: str = "manual", force: bool = False) -> Dict[str, Any]:
-    from rules_store import mark_rule_run
+    from rules import store as rules_store
 
     rule_id = rule.get("id", "")
     trigger = rule.get("trigger") or {}
@@ -125,21 +125,21 @@ def run_rule(rule: Dict[str, Any], *, source: str = "manual", force: bool = Fals
     try:
         result = execute_rule_actions(rule, source="rule" if source == "auto" else "manual")
         LAST_FIRED[rule_id] = time.time()
-        mark_rule_run(rule_id, status="ok", message=result["message"])
+        rules_store.mark_rule_run(rule_id, status="ok", message=result["message"])
         _record_run(rule_id, source, True, result["message"], result.get("actions"))
         result["skipped"] = False
         return result
     except Exception as exc:
         msg = str(exc)
-        mark_rule_run(rule_id, status="error", message=msg)
+        rules_store.mark_rule_run(rule_id, status="error", message=msg)
         _record_run(rule_id, source, False, msg)
         raise
 
 
 def run_rule_by_id(rule_id: str) -> Dict[str, Any]:
-    from rules_store import get_rule
+    from rules import store as rules_store
 
-    rule = get_rule(rule_id)
+    rule = rules_store.get_rule(rule_id)
     if not rule:
         raise ValueError("规则不存在")
     return run_rule(rule, source="manual", force=True)
@@ -160,13 +160,13 @@ def evaluate_all(rules: List[Dict[str, Any]], state: Dict[str, Any]) -> None:
 
 
 def _engine_loop() -> None:
-    from rules_store import list_rules
+    from rules import store as rules_store
 
     while not ENGINE_STOP.is_set():
         try:
             if _snapshot_state is not None:
                 state = _snapshot_state()
-                evaluate_all(list_rules(), state)
+                evaluate_all(rules_store.list_rules(), state)
         except Exception as exc:
             print(f"[rules] engine loop error: {exc}")
         ENGINE_STOP.wait(POLL_INTERVAL_SECONDS)

@@ -7,7 +7,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from rule_schema import validate_rule_payload
+from rules.schema import validate_rule_payload
 
 RULES_LOCK = threading.Lock()
 RULES_FILE: Optional[Path] = None

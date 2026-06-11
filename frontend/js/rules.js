@@ -74,6 +74,10 @@ function findActionsForDevice(meta, deviceId) {
   return (meta.actions || []).filter((a) => a.device === deviceId);
 }
 
+function executorDevices(meta) {
+  return meta.state_devices || [];
+}
+
 function renderTriggerFields(form, meta, trigger = {}) {
   const type = form.querySelector("#ruleTriggerType").value;
   const box = form.querySelector("#ruleTriggerFields");
@@ -158,7 +162,7 @@ function renderActionRow(meta, action = {}) {
 
   return `
     <div class="action-row">
-      <label>设备<select class="action-device">${optionItems(meta.actions.filter((a, i, arr) => arr.findIndex((x) => x.device === a.device) === i), device, { valueKey: "device", labelKey: "label", disabledKey: "available" })}</select></label>
+      <label>设备<select class="action-device">${optionItems(executorDevices(meta), device, { valueKey: "device", labelKey: "label", disabledKey: "available" })}</select></label>
       <label>动作<select class="action-type">${deviceActions.map((a) => `<option value="${a.action}" ${a.action === act ? "selected" : ""} ${a.available === false ? "disabled" : ""}>${escapeHtml(a.label)}</option>`).join("")}</select></label>
       <div class="action-params">${paramsHtml}</div>
       <button type="button" class="secondary action-remove">移除</button>

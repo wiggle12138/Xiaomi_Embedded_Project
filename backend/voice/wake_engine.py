@@ -7,7 +7,8 @@ import time
 from pathlib import Path
 from typing import Callable, Optional
 
-ROOT_DIR = Path(__file__).resolve().parent.parent
+from config.paths import ROOT_DIR
+
 SAMPLE_RATE = 16000
 CHUNK_SAMPLES = int(0.1 * SAMPLE_RATE)
 
